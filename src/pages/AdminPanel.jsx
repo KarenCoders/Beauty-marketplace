@@ -124,7 +124,15 @@ export default function AdminPanel() {
         color_secundario: negocio.color_secundario,
         mapa_enlace: negocio.mapa_enlace,
         mapa_embed: negocio.mapa_embed,
-        descripcion_corta: negocio.descripcion_corta
+        descripcion_corta: negocio.descripcion_corta,
+        direccion: negocio.direccion,
+        telefono: negocio.telefono,
+        whatsapp: negocio.whatsapp,
+        facebook: negocio.facebook,
+        instagram: negocio.instagram,
+        tiktok: negocio.tiktok,
+        fidelidad_puntos_meta: negocio.fidelidad_puntos_meta,
+        fidelidad_recompensa: negocio.fidelidad_recompensa
       }).eq('id', negocio.id).select();
       
       if (error) throw error;
@@ -175,6 +183,19 @@ export default function AdminPanel() {
         }
       }
     } catch (error) { alert('Error al completar cita'); }
+  }
+
+  async function handleConfirmarCita(cita) {
+    try {
+      await supabase.from('citas').update({ estado: 'confirmada' }).eq('id', cita.id);
+      setCitas(citas.map(c => c.id === cita.id ? { ...c, estado: 'confirmada' } : c));
+      
+      const phone = cita.cliente_telefono ? cita.cliente_telefono.replace(/\D/g, '') : '';
+      if (phone) {
+        const msg = `¡Hola ${cita.cliente_nombre}! Tu cita para el ${cita.fecha} a las ${cita.hora.substring(0,5)} ha sido confirmada. ¡Te esperamos!`;
+        window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+      }
+    } catch (error) { alert('Error al confirmar'); }
   }
 
   // --- COMENTARIOS ---
@@ -294,6 +315,7 @@ export default function AdminPanel() {
                   <td className="px-6 py-4">
                     <span className={`px-2 py-1 rounded-md text-xs font-bold ${
                       cita.estado === 'completada' ? 'bg-green-100 text-green-700' :
+                      cita.estado === 'confirmada' ? 'bg-blue-100 text-blue-700' :
                       cita.estado === 'cancelada' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'
                     }`}>
                       {cita.estado}
@@ -302,6 +324,9 @@ export default function AdminPanel() {
                   <td className="px-6 py-4 text-right flex gap-2 justify-end">
                     {cita.estado !== 'cancelada' && cita.estado !== 'completada' && (
                       <>
+                        {cita.estado === 'pendiente' && (
+                          <button onClick={() => handleConfirmarCita(cita)} className="text-blue-600 hover:bg-blue-50 px-2 py-1 rounded font-bold transition-colors">Confirmar</button>
+                        )}
                         <button onClick={() => handleCompletarCita(cita)} className="text-green-600 hover:bg-green-50 px-2 py-1 rounded font-bold transition-colors">Completar</button>
                         <button onClick={() => handleCancelarCita(cita)} className="text-red-500 hover:bg-red-50 px-2 py-1 rounded font-bold transition-colors">Cancelar</button>
                       </>
@@ -454,7 +479,65 @@ export default function AdminPanel() {
               <textarea value={negocio.descripcion_corta || ''} onChange={e => setNegocio({...negocio, descripcion_corta: e.target.value})} className="w-full px-4 py-2 border rounded-xl" rows="2" placeholder="Escribe una breve descripción o eslogan para tu negocio..."></textarea>
             </div>
 
-            <div>
+            <div className="border-t pt-4">
+              <h4 className="font-bold mb-4 flex items-center">Información de Contacto</h4>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold mb-2">Dirección Física</label>
+                  <input type="text" value={negocio.direccion || ''} onChange={e => setNegocio({...negocio, direccion: e.target.value})} className="w-full px-4 py-2 border rounded-xl" placeholder="Ej. Av. Principal 123" />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-bold mb-2">Teléfono</label>
+                    <input type="text" value={negocio.telefono || ''} onChange={e => setNegocio({...negocio, telefono: e.target.value})} className="w-full px-4 py-2 border rounded-xl" placeholder="Ej. 555-1234" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold mb-2">WhatsApp</label>
+                    <input type="text" value={negocio.whatsapp || ''} onChange={e => setNegocio({...negocio, whatsapp: e.target.value})} className="w-full px-4 py-2 border rounded-xl" placeholder="Ej. +1234567890" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t pt-4">
+              <h4 className="font-bold mb-4 flex items-center">Redes Sociales</h4>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold mb-2">Facebook URL</label>
+                  <input type="url" value={negocio.facebook || ''} onChange={e => setNegocio({...negocio, facebook: e.target.value})} className="w-full px-4 py-2 border rounded-xl" placeholder="https://facebook.com/..." />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-bold mb-2">Instagram URL</label>
+                  <input type="url" value={negocio.instagram || ''} onChange={e => setNegocio({...negocio, instagram: e.target.value})} className="w-full px-4 py-2 border rounded-xl" placeholder="https://instagram.com/..." />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-bold mb-2">TikTok URL</label>
+                  <input type="url" value={negocio.tiktok || ''} onChange={e => setNegocio({...negocio, tiktok: e.target.value})} className="w-full px-4 py-2 border rounded-xl" placeholder="https://tiktok.com/@..." />
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t pt-4">
+              <h4 className="font-bold mb-4 flex items-center text-amber-500">Programa de Fidelidad</h4>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold mb-2">Puntos Meta (Citas necesarias para premio)</label>
+                  <input type="number" min="1" max="20" value={negocio.fidelidad_puntos_meta || 10} onChange={e => setNegocio({...negocio, fidelidad_puntos_meta: parseInt(e.target.value)})} className="w-full px-4 py-2 border rounded-xl" />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold mb-2">Recompensa (Premio)</label>
+                  <input type="text" value={negocio.fidelidad_recompensa || ''} onChange={e => setNegocio({...negocio, fidelidad_recompensa: e.target.value})} className="w-full px-4 py-2 border rounded-xl" placeholder="Ej. Corte gratis en tu décima cita" />
+                  <p className="text-xs text-gray-500 mt-1">Este texto aparecerá en la tarjeta de los clientes para motivarlos a regresar.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t pt-4">
               <label className="block text-sm font-bold mb-2">Enlace de Google Maps (Para botón "Cómo llegar")</label>
               <input type="url" value={negocio.mapa_enlace || ''} onChange={e => setNegocio({...negocio, mapa_enlace: e.target.value})} className="w-full px-4 py-2 border rounded-xl" placeholder="https://maps.app.goo.gl/..." />
             </div>

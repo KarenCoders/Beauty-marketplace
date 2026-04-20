@@ -20,7 +20,13 @@ export default function SuperAdminPanel() {
     categoria: '',
     admin_email: '',
     admin_password: '',
-    descripcion_corta: ''
+    descripcion_corta: '',
+    direccion: '',
+    telefono: '',
+    whatsapp: '',
+    facebook: '',
+    instagram: '',
+    tiktok: ''
   });
 
   useEffect(() => {
@@ -83,7 +89,13 @@ export default function SuperAdminPanel() {
         categoria: negocio.categoria || '',
         admin_email: negocio.admin_email || '',
         admin_password: negocio.admin_password || '',
-        descripcion_corta: negocio.descripcion_corta || ''
+        descripcion_corta: negocio.descripcion_corta || '',
+        direccion: negocio.direccion || '',
+        telefono: negocio.telefono || '',
+        whatsapp: negocio.whatsapp || '',
+        facebook: negocio.facebook || '',
+        instagram: negocio.instagram || '',
+        tiktok: negocio.tiktok || ''
       });
       setEditingId(negocio.id);
     } else {
@@ -93,7 +105,13 @@ export default function SuperAdminPanel() {
         categoria: '',
         admin_email: '',
         admin_password: '',
-        descripcion_corta: ''
+        descripcion_corta: '',
+        direccion: '',
+        telefono: '',
+        whatsapp: '',
+        facebook: '',
+        instagram: '',
+        tiktok: ''
       });
       setEditingId(null);
     }
@@ -184,9 +202,47 @@ export default function SuperAdminPanel() {
                 <label className="block text-sm font-bold text-gray-700 mb-1">Categoría</label>
                 <input required type="text" value={form.categoria} onChange={e=>setForm({...form,categoria:e.target.value})} className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-pink-500 outline-none transition-colors" placeholder="Ej. Barbería, Salón de Belleza, Spa" />
               </div>
+              
+              <div className="md:col-span-2 border-t pt-4 mt-2">
+                <h4 className="font-bold text-indigo-600 mb-4 flex items-center"><Store className="mr-2 h-5 w-5"/> Información de Contacto</h4>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-bold text-gray-700 mb-1">Dirección Física</label>
+                <input type="text" value={form.direccion} onChange={e=>setForm({...form,direccion:e.target.value})} className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-pink-500 outline-none transition-colors" placeholder="Ej. Av. Principal 123, Ciudad" />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Teléfono</label>
+                <input type="text" value={form.telefono} onChange={e=>setForm({...form,telefono:e.target.value})} className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-pink-500 outline-none transition-colors" placeholder="Ej. 555-1234" />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">WhatsApp</label>
+                <input type="text" value={form.whatsapp} onChange={e=>setForm({...form,whatsapp:e.target.value})} className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-pink-500 outline-none transition-colors" placeholder="Ej. +1234567890" />
+              </div>
               <div className="md:col-span-2">
                 <label className="block text-sm font-bold text-gray-700 mb-1">Descripción Corta</label>
                 <textarea value={form.descripcion_corta} onChange={e=>setForm({...form,descripcion_corta:e.target.value})} className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-pink-500 outline-none transition-colors" rows="2" placeholder="Eslogan o breve descripción"></textarea>
+              </div>
+
+              <div className="md:col-span-2 border-t pt-4 mt-2">
+                <h4 className="font-bold text-indigo-600 mb-4 flex items-center"><Store className="mr-2 h-5 w-5"/> Redes Sociales (Opcional)</h4>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Facebook URL</label>
+                <input type="url" value={form.facebook} onChange={e=>setForm({...form,facebook:e.target.value})} className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-pink-500 outline-none transition-colors" placeholder="https://facebook.com/..." />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Instagram URL</label>
+                <input type="url" value={form.instagram} onChange={e=>setForm({...form,instagram:e.target.value})} className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-pink-500 outline-none transition-colors" placeholder="https://instagram.com/..." />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">TikTok URL</label>
+                <input type="url" value={form.tiktok} onChange={e=>setForm({...form,tiktok:e.target.value})} className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-pink-500 outline-none transition-colors" placeholder="https://tiktok.com/@..." />
               </div>
 
               <div className="md:col-span-2 border-t pt-4 mt-2">

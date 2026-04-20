@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { User, Star, Award, CheckCircle2, X } from 'lucide-react';
 
 export default function EmployeePanel() {
   const navigate = useNavigate();
   const [session, setSession] = useState(null);
   const [citas, setCitas] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [viewingCard, setViewingCard] = useState(null);
 
   useEffect(() => {
     const sessionStr = localStorage.getItem('session');
@@ -35,7 +37,7 @@ export default function EmployeePanel() {
     try {
       const { data, error } = await supabase
         .from('citas')
-        .select(`*, servicios (nombre, duracion_min)`)
+        .select(`*, servicios (nombre, duracion_min), negocios (id, nombre, logo_url, color_primario, fidelidad_puntos_meta, fidelidad_recompensa)`)
         .eq('empleado_id', empleadoId)
         .order('fecha', { ascending: true })
         .order('hora', { ascending: true });
@@ -64,6 +66,19 @@ export default function EmployeePanel() {
     } catch (error) { alert('Error al cancelar'); }
   }
 
+  async function handleConfirmarCita(cita) {
+    try {
+      await supabase.from('citas').update({ estado: 'confirmada' }).eq('id', cita.id);
+      setCitas(citas.map(c => c.id === cita.id ? { ...c, estado: 'confirmada' } : c));
+      
+      const phone = cita.cliente_telefono ? cita.cliente_telefono.replace(/\D/g, '') : '';
+      if (phone) {
+        const msg = `¡Hola ${cita.cliente_nombre}! Tu cita para el ${cita.fecha} a las ${cita.hora.substring(0,5)} ha sido confirmada. ¡Te esperamos!`;
+        window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+      }
+    } catch (error) { alert('Error al confirmar'); }
+  }
+
   async function handleCompletarCita(cita) {
     if (!confirm('¿Marcar esta cita como completada? Si el cliente tiene cuenta, ganará 1 punto de fidelidad.')) return;
     try {
@@ -78,13 +93,82 @@ export default function EmployeePanel() {
           .eq('negocio_id', cita.negocio_id)
           .single();
           
+        const hoy = new Date().toISOString().split('T')[0];
+        const meta = cita.negocios?.fidelidad_puntos_meta || 10;
+          
         if (tarjeta) {
-          await supabase.from('tarjetas_fidelidad').update({ puntos: tarjeta.puntos + 1 }).eq('id', tarjeta.id);
+          await supabase.from('tarjetas_fidelidad').update({ 
+            puntos: tarjeta.puntos + 1,
+            historial_sellos: [...(tarjeta.historial_sellos || []), hoy]
+          }).eq('id', tarjeta.id);
         } else {
-          await supabase.from('tarjetas_fidelidad').insert([{ cliente_id: cita.cliente_id, negocio_id: cita.negocio_id, puntos: 1 }]);
+          await supabase.from('tarjetas_fidelidad').insert([{ 
+            cliente_id: cita.cliente_id, 
+            negocio_id: cita.negocio_id, 
+            puntos: 1, 
+            puntos_totales: meta,
+            historial_sellos: [hoy]
+          }]);
         }
       }
     } catch (error) { alert('Error al completar cita'); }
+  }
+
+  async function openTarjetaModal(cita) {
+    if (!cita.cliente_id) {
+      alert('Este cliente agendó sin cuenta, por lo que no tiene tarjeta de fidelidad.');
+      return;
+    }
+    const { data: tarjeta } = await supabase
+      .from('tarjetas_fidelidad')
+      .select('*')
+      .eq('cliente_id', cita.cliente_id)
+      .eq('negocio_id', cita.negocio_id)
+      .single();
+    
+    setViewingCard({ cita, tarjeta: tarjeta || { puntos: 0, historial_sellos: [], puntos_totales: cita.negocios?.fidelidad_puntos_meta || 10 } });
+  }
+
+  async function handleSellarManualmente() {
+    if (!viewingCard || !viewingCard.cita.cliente_id) return;
+    const { cita, tarjeta } = viewingCard;
+    const meta = cita.negocios?.fidelidad_puntos_meta || 10;
+    
+    if (tarjeta.puntos >= meta) {
+      alert('La tarjeta ya está llena.');
+      return;
+    }
+
+    const fechaSello = prompt('Ingresa la fecha para este sello (ej. ' + new Date().toISOString().split('T')[0] + '):', new Date().toISOString().split('T')[0]);
+    if (!fechaSello) return;
+
+    try {
+      const nuevoHistorial = [...(tarjeta.historial_sellos || []), fechaSello];
+      const nuevosPuntos = tarjeta.puntos + 1;
+      
+      let res;
+      if (tarjeta.id) {
+        res = await supabase.from('tarjetas_fidelidad').update({
+          puntos: nuevosPuntos,
+          historial_sellos: nuevoHistorial
+        }).eq('id', tarjeta.id).select().single();
+      } else {
+        res = await supabase.from('tarjetas_fidelidad').insert([{
+          cliente_id: cita.cliente_id,
+          negocio_id: cita.negocio_id,
+          puntos: nuevosPuntos,
+          puntos_totales: meta,
+          historial_sellos: nuevoHistorial
+        }]).select().single();
+      }
+
+      if (res.error) throw res.error;
+      
+      setViewingCard({ ...viewingCard, tarjeta: res.data });
+      alert('Sello agregado manualmente.');
+    } catch (error) {
+      alert('Error al agregar sello.');
+    }
   }
 
   if (!session) return null;
@@ -127,7 +211,17 @@ export default function EmployeePanel() {
                     <div className="mt-2 flex items-center justify-between sm:mt-0 font-medium sm:w-1/2">
                       <p className="text-sm text-gray-500">{cita.servicios?.nombre}</p>
                       <div className="flex gap-2">
+                        {cita.cliente_id && (
+                          <button onClick={() => openTarjetaModal(cita)} className="text-xs text-amber-600 hover:bg-amber-50 px-2 py-1 rounded transition-colors border border-amber-100 font-bold flex items-center">
+                            <Star className="w-3 h-3 mr-1" /> Tarjeta
+                          </button>
+                        )}
                         {cita.estado === 'pendiente' && (
+                          <button onClick={() => handleConfirmarCita(cita)} className="text-xs text-blue-600 hover:bg-blue-50 px-2 py-1 rounded transition-colors border border-blue-100 font-bold">
+                            Confirmar
+                          </button>
+                        )}
+                        {(cita.estado === 'pendiente' || cita.estado === 'confirmada') && (
                           <button onClick={() => handleCompletarCita(cita)} className="text-xs text-green-600 hover:bg-green-50 px-2 py-1 rounded transition-colors border border-green-100 font-bold">
                             Completar
                           </button>
@@ -161,7 +255,17 @@ export default function EmployeePanel() {
                       <p className="text-sm text-gray-600">{cita.servicios?.nombre}</p>
                     </div>
                     <div className="flex gap-2">
+                      {cita.cliente_id && (
+                        <button onClick={() => openTarjetaModal(cita)} className="text-xs text-amber-600 hover:bg-amber-50 px-2 py-1 rounded transition-colors border border-amber-100 font-bold flex items-center">
+                          <Star className="w-3 h-3 mr-1" /> Tarjeta
+                        </button>
+                      )}
                       {cita.estado === 'pendiente' && (
+                        <button onClick={() => handleConfirmarCita(cita)} className="text-xs text-blue-600 hover:bg-blue-50 px-2 py-1 rounded transition-colors border border-blue-100 font-bold">
+                          Confirmar
+                        </button>
+                      )}
+                      {(cita.estado === 'pendiente' || cita.estado === 'confirmada') && (
                         <button onClick={() => handleCompletarCita(cita)} className="text-xs text-green-600 hover:bg-green-50 px-2 py-1 rounded transition-colors border border-green-100 font-bold">
                           Completar
                         </button>
@@ -179,6 +283,79 @@ export default function EmployeePanel() {
           )}
         </section>
       </div>
+
+      {viewingCard && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={() => setViewingCard(null)}></div>
+          <div className="bg-[#fafafa] rounded-2xl shadow-2xl relative z-10 w-full max-w-lg p-8 sm:p-10 border border-gray-200 text-center animate-in zoom-in-95">
+            <button type="button" onClick={() => setViewingCard(null)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 bg-gray-100 p-2 rounded-full transition-colors">
+              <X className="h-5 w-5" />
+            </button>
+            
+            {(() => {
+              const meta = viewingCard.cita.negocios?.fidelidad_puntos_meta || 10;
+              const recompensa = viewingCard.cita.negocios?.fidelidad_recompensa || 'Premio sorpresa al completar tu tarjeta';
+              const completada = viewingCard.tarjeta.puntos >= meta;
+              const primaryColor = viewingCard.cita.negocios?.color_primario || '#000000';
+
+              return (
+                <div className="flex flex-col items-center">
+                  <div className="mb-2">
+                    <h2 className="text-xl sm:text-2xl font-black tracking-widest uppercase text-gray-900" style={{ fontFamily: 'sans-serif' }}>
+                      Tarjeta de
+                    </h2>
+                    <h3 className="text-3xl sm:text-4xl -mt-2 mb-6" style={{ fontFamily: 'cursive', color: primaryColor }}>
+                      fidelidad
+                    </h3>
+                  </div>
+
+                  <p className="text-gray-500 font-medium tracking-wide mb-8 text-sm">
+                    {recompensa}
+                  </p>
+
+                  <div className={`flex flex-wrap justify-center gap-3 mb-8 w-full`}>
+                    {[...Array(meta)].map((_, idx) => {
+                      const isStamped = idx < viewingCard.tarjeta.puntos;
+                      const isReward = idx === meta - 1;
+                      
+                      if (isReward) {
+                        return (
+                          <div key={idx} onClick={!isStamped && viewingCard.tarjeta.puntos === idx ? handleSellarManualmente : undefined} className={`w-14 h-14 rounded-full flex flex-col items-center justify-center text-white font-black leading-tight shadow-md transition-transform ${!isStamped && viewingCard.tarjeta.puntos === idx ? 'cursor-pointer hover:scale-110 ring-4 ring-amber-300 animate-pulse' : ''}`} style={{ backgroundColor: primaryColor }}>
+                            <span className="text-[10px]">PREMIO</span>
+                            {isStamped && <CheckCircle2 className="h-4 w-4 mt-1" />}
+                          </div>
+                        )
+                      }
+                      
+                      return (
+                        <div key={idx} onClick={!isStamped && viewingCard.tarjeta.puntos === idx ? handleSellarManualmente : undefined} className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 ${!isStamped && viewingCard.tarjeta.puntos === idx ? 'cursor-pointer hover:scale-110 ring-4 ring-amber-300 animate-pulse bg-white' : ''}`} style={{ 
+                          border: `2px solid ${primaryColor}`,
+                          backgroundColor: isStamped ? `${primaryColor}15` : 'transparent'
+                        }}>
+                          {isStamped && (
+                            <div className="w-8 h-8 rounded-full flex flex-col items-center justify-center text-white shadow-sm" style={{ backgroundColor: primaryColor }}>
+                              <CheckCircle2 className="h-4 w-4" />
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  <div className="w-full bg-blue-50 text-blue-700 p-4 rounded-xl text-sm font-medium mb-4">
+                    Cliente: <strong>{viewingCard.cita.cliente_nombre}</strong><br/>
+                    Puntos actuales: <strong>{viewingCard.tarjeta.puntos} / {meta}</strong>
+                  </div>
+
+                  <p className="text-xs text-gray-400 mt-2">
+                    Para sellar manualmente un punto, haz clic en el siguiente círculo disponible.
+                  </p>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -3,7 +3,8 @@ import { useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { 
   Clock, DollarSign, MapPin, Phone, Calendar as CalendarIcon, 
-  User, ChevronRight, CheckCircle2, X, ChevronLeft, MessageSquare 
+  User, ChevronRight, CheckCircle2, X, ChevronLeft, MessageSquare,
+  Users, Camera, Link2
 } from 'lucide-react';
 import { 
   format, addMonths, subMonths, startOfMonth, endOfMonth, 
@@ -395,6 +396,26 @@ export default function BusinessPage() {
                   </div>
                 )}
               </div>
+
+              {(negocio.facebook || negocio.instagram || negocio.tiktok) && (
+                <div className="flex gap-3 mt-4 items-center justify-center md:justify-start">
+                  {negocio.facebook && (
+                    <a href={negocio.facebook} target="_blank" rel="noreferrer" className="bg-white/10 hover:bg-white/20 p-2.5 rounded-full backdrop-blur-sm transition-all hover:scale-110">
+                      <Users className="h-5 w-5 text-white" />
+                    </a>
+                  )}
+                  {negocio.instagram && (
+                    <a href={negocio.instagram} target="_blank" rel="noreferrer" className="bg-white/10 hover:bg-white/20 p-2.5 rounded-full backdrop-blur-sm transition-all hover:scale-110">
+                      <Camera className="h-5 w-5 text-white" />
+                    </a>
+                  )}
+                  {negocio.tiktok && (
+                    <a href={negocio.tiktok} target="_blank" rel="noreferrer" className="bg-white/10 hover:bg-white/20 p-2.5 rounded-full backdrop-blur-sm transition-all hover:scale-110">
+                      <Link2 className="h-5 w-5 text-white" />
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>

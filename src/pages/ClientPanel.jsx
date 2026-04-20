@@ -34,12 +34,12 @@ export default function ClientPanel() {
       const [citasRes, tarjetasRes] = await Promise.all([
         supabase
           .from('citas')
-          .select('*, negocios(nombre), servicios(nombre)')
+          .select('*, negocios(id, nombre, logo_url, color_primario, color_secundario, fidelidad_puntos_meta, fidelidad_recompensa), servicios(nombre)')
           .eq('cliente_id', clienteId)
           .order('fecha', { ascending: true }),
         supabase
           .from('tarjetas_fidelidad')
-          .select('*, negocios(nombre, logo_url)')
+          .select('*')
           .eq('cliente_id', clienteId)
       ]);
 
@@ -47,7 +47,34 @@ export default function ClientPanel() {
       if (tarjetasRes.error) throw tarjetasRes.error;
 
       setCitas(citasRes.data || []);
-      setTarjetas(tarjetasRes.data || []);
+      
+      const reales = tarjetasRes.data || [];
+      const negociosUnicos = new Map();
+      
+      (citasRes.data || []).forEach(c => {
+        if (c.negocios && !negociosUnicos.has(c.negocio_id)) {
+          negociosUnicos.set(c.negocio_id, c.negocios);
+        }
+      });
+
+      const tarjetasMostradas = [];
+      negociosUnicos.forEach((negocio, negocio_id) => {
+        const tarjetaReal = reales.find(t => t.negocio_id === negocio_id);
+        if (tarjetaReal) {
+          tarjetasMostradas.push({ ...tarjetaReal, negocios: negocio });
+        } else {
+          tarjetasMostradas.push({
+            id: 'virtual-' + negocio_id,
+            cliente_id: clienteId,
+            negocio_id: negocio_id,
+            puntos: 0,
+            puntos_totales: negocio.fidelidad_puntos_meta || 10,
+            negocios: negocio
+          });
+        }
+      });
+
+      setTarjetas(tarjetasMostradas);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -68,13 +95,17 @@ export default function ClientPanel() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 mt-20">
-      <div className="flex flex-col md:flex-row justify-between items-center mb-8 bg-blue-600 rounded-[2rem] p-8 text-white shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2"></div>
+      <div className="flex flex-col md:flex-row justify-between items-center mb-8 bg-gradient-to-r from-rose-400 via-pink-500 to-purple-600 rounded-[2rem] p-8 text-white shadow-xl relative overflow-hidden group hover:shadow-2xl hover:-translate-y-1 transition-all duration-500">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/20 rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2 group-hover:scale-150 transition-transform duration-700"></div>
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/10 rounded-full blur-2xl transform -translate-x-1/2 translate-y-1/2 group-hover:scale-150 transition-transform duration-700"></div>
         <div className="relative z-10 text-center md:text-left">
-          <h1 className="text-3xl font-extrabold tracking-tight">Mi Cuenta</h1>
-          <p className="mt-2 text-blue-100 font-medium text-lg">Hola, {session.nombre}</p>
+          <h1 className="text-4xl font-extrabold tracking-tight drop-shadow-md">Mi Cuenta</h1>
+          <p className="mt-2 text-rose-50 font-medium text-xl drop-shadow-sm flex items-center justify-center md:justify-start">
+            <span className="bg-white/20 px-3 py-1 rounded-full text-sm mr-3 backdrop-blur-md border border-white/30">Nivel VIP</span>
+            Hola, {session.nombre}
+          </p>
         </div>
-        <button onClick={handleLogout} className="relative z-10 mt-4 md:mt-0 bg-white/20 hover:bg-white/30 backdrop-blur-md px-6 py-3 rounded-xl font-bold transition-all border border-white/30 shadow-lg">
+        <button onClick={handleLogout} className="relative z-10 mt-6 md:mt-0 bg-white text-pink-600 hover:bg-rose-50 px-8 py-3 rounded-xl font-bold transition-all shadow-lg hover:shadow-xl hover:scale-105 active:scale-95">
           Cerrar Sesión
         </button>
       </div>
@@ -172,49 +203,94 @@ export default function ClientPanel() {
             </div>
           ) : (
             <div className="grid lg:grid-cols-2 gap-8">
-              {tarjetas.map(t => (
-                <div key={t.id} className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-8 text-white shadow-2xl relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-bl-full"></div>
+              {tarjetas.map(t => {
+                const meta = t.negocios?.fidelidad_puntos_meta || t.puntos_totales || 10;
+                const recompensa = t.negocios?.fidelidad_recompensa || 'Premio sorpresa al completar tu tarjeta';
+                const completada = t.puntos >= meta;
+                const primaryColor = t.negocios?.color_primario || '#000000';
+
+                return (
+                <div key={t.id} className="relative bg-[#fafafa] rounded-xl p-8 sm:p-12 shadow-[0_10px_40px_rgba(0,0,0,0.06)] overflow-hidden border border-gray-200 hover:shadow-[0_15px_50px_rgba(0,0,0,0.12)] transition-shadow duration-300 flex flex-col items-center text-center">
                   
-                  <div className="flex items-center gap-4 mb-8">
-                    {t.negocios?.logo_url ? (
-                      <img src={t.negocios.logo_url} className="w-16 h-16 rounded-full border-2 border-white/20 object-cover" alt=""/>
-                    ) : (
-                      <div className="w-16 h-16 rounded-full border-2 border-white/20 flex items-center justify-center text-xl font-bold bg-white/10">
-                        {t.negocios?.nombre?.charAt(0)}
-                      </div>
-                    )}
-                    <div>
-                      <h3 className="text-2xl font-black tracking-tight">{t.negocios?.nombre}</h3>
-                      <p className="text-gray-400 font-medium text-sm">Cliente Frecuente</p>
-                    </div>
+                  {/* Header / Titles */}
+                  <div className="mb-2">
+                    <h2 className="text-2xl sm:text-3xl font-black tracking-widest uppercase text-gray-900" style={{ fontFamily: 'sans-serif' }}>
+                      Tarjeta de
+                    </h2>
+                    <h3 className="text-4xl sm:text-5xl -mt-2 mb-6" style={{ fontFamily: 'cursive', color: primaryColor }}>
+                      fidelidad
+                    </h3>
                   </div>
 
-                  <div className="flex justify-between items-end mb-4">
-                    <div className="font-bold text-gray-300">Progreso</div>
-                    <div className="text-3xl font-black text-amber-400">{t.puntos} <span className="text-lg text-gray-500">/ {t.puntos_totales}</span></div>
-                  </div>
+                  <p className="text-gray-500 font-medium tracking-wide mb-8 text-sm sm:text-base">
+                    {recompensa}
+                  </p>
 
                   {/* Stamp Grid */}
-                  <div className="grid grid-cols-5 gap-3">
-                    {[...Array(t.puntos_totales)].map((_, idx) => (
-                      <div key={idx} className={`aspect-square rounded-full flex items-center justify-center transition-all duration-500 ${
-                        idx < t.puntos 
-                          ? 'bg-amber-400 text-yellow-900 shadow-[0_0_15px_rgba(251,191,36,0.4)] scale-110' 
-                          : 'bg-white/10 text-white/20 border border-white/5'
-                      }`}>
-                        {idx === t.puntos_totales - 1 ? <Award className="h-1/2 w-1/2" /> : <Star className="h-1/2 w-1/2" />}
-                      </div>
-                    ))}
+                  <div className={`flex flex-wrap justify-center gap-3 sm:gap-4 mb-10 w-full`}>
+                    {[...Array(meta)].map((_, idx) => {
+                      const isStamped = idx < t.puntos;
+                      const isReward = idx === meta - 1;
+                      
+                      let fechaStr = '';
+                      if (isStamped && t.historial_sellos && t.historial_sellos[idx]) {
+                        const dateParts = t.historial_sellos[idx].split('-');
+                        if (dateParts.length === 3) {
+                          fechaStr = `${dateParts[2]}/${dateParts[1]}`;
+                        }
+                      }
+                      
+                      if (isReward) {
+                        return (
+                          <div key={idx} className="w-16 h-16 sm:w-20 sm:h-20 rounded-full flex flex-col items-center justify-center text-white font-black leading-tight shadow-md transition-transform hover:scale-105" style={{ backgroundColor: primaryColor }}>
+                            <span className="text-xs sm:text-sm">PREMIO</span>
+                            {isStamped && <span className="text-[10px] sm:text-xs mt-1 font-medium bg-white/20 px-2 py-0.5 rounded-full">{fechaStr || '✓'}</span>}
+                          </div>
+                        )
+                      }
+                      
+                      return (
+                        <div key={idx} className="w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center transition-all duration-300" style={{ 
+                          border: `2px solid ${primaryColor}`,
+                          backgroundColor: isStamped ? `${primaryColor}15` : 'transparent'
+                        }}>
+                          {isStamped && (
+                            <div className="w-10 h-10 rounded-full flex flex-col items-center justify-center text-white shadow-sm" style={{ backgroundColor: primaryColor }}>
+                              {fechaStr ? <span className="text-[10px] sm:text-xs font-bold leading-none">{fechaStr}</span> : <CheckCircle2 className="h-5 w-5" />}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                   
-                  {t.puntos >= t.puntos_totales && (
-                    <div className="mt-6 bg-amber-400/20 text-amber-300 border border-amber-400/30 p-3 rounded-xl text-center font-bold text-sm animate-pulse">
-                      ¡Felicidades! Has completado tu tarjeta. Pide tu recompensa.
+                  {/* Footer / Social Info */}
+                  <div className="mt-auto w-full flex flex-col items-center pt-6 border-t border-gray-200">
+                    <div className="flex items-center gap-2 font-bold text-gray-800 text-lg mb-1">
+                      {t.negocios?.logo_url && <img src={t.negocios.logo_url} className="w-6 h-6 rounded-full object-cover" alt="" />}
+                      {t.negocios?.nombre}
+                    </div>
+                    <div className="flex text-gray-400 gap-1 mt-2">
+                      {/* Generics icons acting as social media */}
+                      <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center"><User className="h-3 w-3 text-gray-600"/></div>
+                      <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center"><Star className="h-3 w-3 text-gray-600"/></div>
+                    </div>
+                  </div>
+                  
+                  {completada && (
+                    <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-20">
+                      <div className="bg-white p-8 rounded-2xl shadow-2xl text-center max-w-sm mx-4 transform animate-in zoom-in-95 duration-500">
+                        <div className="mx-auto w-20 h-20 rounded-full mb-4 flex items-center justify-center shadow-lg" style={{ backgroundColor: primaryColor }}>
+                          <Award className="h-10 w-10 text-white" />
+                        </div>
+                        <h3 className="text-2xl font-black text-gray-900 mb-2">¡Felicidades!</h3>
+                        <p className="text-gray-600 mb-6 font-medium">Has completado tu tarjeta de fidelidad. Muéstrale esta pantalla a {t.negocios?.nombre} para reclamar tu premio.</p>
+                      </div>
                     </div>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
