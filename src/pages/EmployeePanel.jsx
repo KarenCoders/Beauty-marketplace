@@ -37,7 +37,7 @@ export default function EmployeePanel() {
     try {
       const { data, error } = await supabase
         .from('citas')
-        .select(`*, servicios (nombre, duracion_min), negocios (id, nombre, logo_url, color_primario, fidelidad_puntos_meta, fidelidad_recompensa)`)
+        .select(`*, servicios (nombre, duracion_min), negocios (id, nombre, logo_url, color_primario, fidelidad_puntos_meta, fidelidad_recompensa, fidelidad_intervalo_premio)`)
         .eq('empleado_id', empleadoId)
         .order('fecha', { ascending: true })
         .order('hora', { ascending: true });
@@ -114,9 +114,9 @@ export default function EmployeePanel() {
     } catch (error) { alert('Error al completar cita'); }
   }
 
-  async function openTarjetaModal(cita) {
+  async function openCitaDetalles(cita) {
     if (!cita.cliente_id) {
-      alert('Este cliente agendó sin cuenta, por lo que no tiene tarjeta de fidelidad.');
+      setViewingCard({ cita, tarjeta: null });
       return;
     }
     const { data: tarjeta } = await supabase
@@ -171,6 +171,23 @@ export default function EmployeePanel() {
     }
   }
 
+  async function handleReiniciarTarjeta() {
+    if (!confirm('¿El cliente ya recibió su premio? Esto reiniciará la tarjeta a 0 puntos para que pueda comenzar de nuevo.')) return;
+    
+    try {
+      const { data, error } = await supabase.from('tarjetas_fidelidad').update({
+        puntos: 0,
+        historial_sellos: []
+      }).eq('id', viewingCard.tarjeta.id).select().single();
+
+      if (error) throw error;
+      setViewingCard({ ...viewingCard, tarjeta: data });
+      alert('Tarjeta reiniciada con éxito.');
+    } catch (err) {
+      alert('Error al reiniciar la tarjeta.');
+    }
+  }
+
   if (!session) return null;
 
   const todayStr = new Date().toISOString().split('T')[0];
@@ -211,11 +228,9 @@ export default function EmployeePanel() {
                     <div className="mt-2 flex items-center justify-between sm:mt-0 font-medium sm:w-1/2">
                       <p className="text-sm text-gray-500">{cita.servicios?.nombre}</p>
                       <div className="flex gap-2">
-                        {cita.cliente_id && (
-                          <button onClick={() => openTarjetaModal(cita)} className="text-xs text-amber-600 hover:bg-amber-50 px-2 py-1 rounded transition-colors border border-amber-100 font-bold flex items-center">
-                            <Star className="w-3 h-3 mr-1" /> Tarjeta
-                          </button>
-                        )}
+                        <button onClick={() => openCitaDetalles(cita)} className="text-xs text-amber-600 hover:bg-amber-50 px-2 py-1 rounded transition-colors border border-amber-100 font-bold flex items-center">
+                          <User className="w-3 h-3 mr-1" /> Perfil & Tarjeta
+                        </button>
                         {cita.estado === 'pendiente' && (
                           <button onClick={() => handleConfirmarCita(cita)} className="text-xs text-blue-600 hover:bg-blue-50 px-2 py-1 rounded transition-colors border border-blue-100 font-bold">
                             Confirmar
@@ -255,11 +270,9 @@ export default function EmployeePanel() {
                       <p className="text-sm text-gray-600">{cita.servicios?.nombre}</p>
                     </div>
                     <div className="flex gap-2">
-                      {cita.cliente_id && (
-                        <button onClick={() => openTarjetaModal(cita)} className="text-xs text-amber-600 hover:bg-amber-50 px-2 py-1 rounded transition-colors border border-amber-100 font-bold flex items-center">
-                          <Star className="w-3 h-3 mr-1" /> Tarjeta
-                        </button>
-                      )}
+                      <button onClick={() => openCitaDetalles(cita)} className="text-xs text-amber-600 hover:bg-amber-50 px-2 py-1 rounded transition-colors border border-amber-100 font-bold flex items-center">
+                        <User className="w-3 h-3 mr-1" /> Perfil & Tarjeta
+                      </button>
                       {cita.estado === 'pendiente' && (
                         <button onClick={() => handleConfirmarCita(cita)} className="text-xs text-blue-600 hover:bg-blue-50 px-2 py-1 rounded transition-colors border border-blue-100 font-bold">
                           Confirmar
@@ -295,61 +308,102 @@ export default function EmployeePanel() {
             {(() => {
               const meta = viewingCard.cita.negocios?.fidelidad_puntos_meta || 10;
               const recompensa = viewingCard.cita.negocios?.fidelidad_recompensa || 'Premio sorpresa al completar tu tarjeta';
-              const completada = viewingCard.tarjeta.puntos >= meta;
+              const interval = viewingCard.cita.negocios?.fidelidad_intervalo_premio || 0;
               const primaryColor = viewingCard.cita.negocios?.color_primario || '#000000';
 
               return (
                 <div className="flex flex-col items-center">
-                  <div className="mb-2">
-                    <h2 className="text-xl sm:text-2xl font-black tracking-widest uppercase text-gray-900" style={{ fontFamily: 'sans-serif' }}>
-                      Tarjeta de
-                    </h2>
-                    <h3 className="text-3xl sm:text-4xl -mt-2 mb-6" style={{ fontFamily: 'cursive', color: primaryColor }}>
-                      fidelidad
-                    </h3>
+                  <div className="w-full bg-white text-left p-5 rounded-xl text-sm font-medium mb-6 shadow-sm border border-gray-100">
+                    <h4 className="font-bold text-gray-800 text-lg mb-4 flex items-center border-b pb-2"><User className="mr-2 h-5 w-5 text-indigo-500" /> Perfil del Cliente y Cita</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <span className="text-gray-500 text-xs uppercase tracking-wider block">Cliente</span>
+                        <span className="font-bold text-gray-900 text-base">{viewingCard.cita.cliente_nombre}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 text-xs uppercase tracking-wider block">Teléfono</span>
+                        <a href={`https://wa.me/${viewingCard.cita.cliente_telefono?.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="font-bold text-blue-600 text-base hover:underline">{viewingCard.cita.cliente_telefono}</a>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 text-xs uppercase tracking-wider block">Servicio</span>
+                        <span className="font-bold text-gray-900">{viewingCard.cita.servicios?.nombre || 'Servicio General'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 text-xs uppercase tracking-wider block">Horario</span>
+                        <span className="font-bold text-gray-900">{viewingCard.cita.fecha} • {viewingCard.cita.hora?.substring(0,5)}</span>
+                      </div>
+                    </div>
                   </div>
 
-                  <p className="text-gray-500 font-medium tracking-wide mb-8 text-sm">
-                    {recompensa}
-                  </p>
+                  {!viewingCard.tarjeta ? (
+                    <div className="w-full bg-amber-50 text-amber-700 p-4 rounded-xl text-sm font-medium border border-amber-200">
+                      Este cliente agendó sin crear cuenta, por lo que no tiene tarjeta de fidelidad vinculada.
+                    </div>
+                  ) : (
+                    <div className="w-full bg-gray-50 p-6 rounded-2xl border border-gray-200 mt-2">
+                      <div className="mb-2 text-center">
+                        <h2 className="text-xl sm:text-2xl font-black tracking-widest uppercase text-gray-900" style={{ fontFamily: 'sans-serif' }}>
+                          Tarjeta de
+                        </h2>
+                        <h3 className="text-3xl sm:text-4xl -mt-2 mb-4" style={{ fontFamily: 'cursive', color: primaryColor }}>
+                          fidelidad
+                        </h3>
+                      </div>
 
-                  <div className={`flex flex-wrap justify-center gap-3 mb-8 w-full`}>
-                    {[...Array(meta)].map((_, idx) => {
-                      const isStamped = idx < viewingCard.tarjeta.puntos;
-                      const isReward = idx === meta - 1;
-                      
-                      if (isReward) {
-                        return (
-                          <div key={idx} onClick={!isStamped && viewingCard.tarjeta.puntos === idx ? handleSellarManualmente : undefined} className={`w-14 h-14 rounded-full flex flex-col items-center justify-center text-white font-black leading-tight shadow-md transition-transform ${!isStamped && viewingCard.tarjeta.puntos === idx ? 'cursor-pointer hover:scale-110 ring-4 ring-amber-300 animate-pulse' : ''}`} style={{ backgroundColor: primaryColor }}>
-                            <span className="text-[10px]">PREMIO</span>
-                            {isStamped && <CheckCircle2 className="h-4 w-4 mt-1" />}
-                          </div>
-                        )
-                      }
-                      
-                      return (
-                        <div key={idx} onClick={!isStamped && viewingCard.tarjeta.puntos === idx ? handleSellarManualmente : undefined} className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 ${!isStamped && viewingCard.tarjeta.puntos === idx ? 'cursor-pointer hover:scale-110 ring-4 ring-amber-300 animate-pulse bg-white' : ''}`} style={{ 
-                          border: `2px solid ${primaryColor}`,
-                          backgroundColor: isStamped ? `${primaryColor}15` : 'transparent'
-                        }}>
-                          {isStamped && (
-                            <div className="w-8 h-8 rounded-full flex flex-col items-center justify-center text-white shadow-sm" style={{ backgroundColor: primaryColor }}>
-                              <CheckCircle2 className="h-4 w-4" />
+                      <p className="text-gray-500 font-medium tracking-wide mb-6 text-sm text-center">
+                        {recompensa}
+                      </p>
+
+                      <div className={`flex flex-wrap justify-center gap-3 mb-6 w-full`}>
+                        {[...Array(meta)].map((_, idx) => {
+                          const isStamped = idx < viewingCard.tarjeta.puntos;
+                          const isReward = idx === meta - 1 || (interval > 0 && (idx + 1) % interval === 0);
+                          
+                          if (isReward) {
+                            return (
+                              <div key={idx} onClick={!isStamped && viewingCard.tarjeta.puntos === idx ? handleSellarManualmente : undefined} className={`w-14 h-14 rounded-full flex flex-col items-center justify-center text-white font-black leading-tight shadow-md transition-transform ${!isStamped && viewingCard.tarjeta.puntos === idx ? 'cursor-pointer hover:scale-110 ring-4 ring-amber-300 animate-pulse' : ''}`} style={{ backgroundColor: primaryColor }}>
+                                <span className="text-[10px]">PREMIO</span>
+                                {isStamped && <CheckCircle2 className="h-4 w-4 mt-1" />}
+                              </div>
+                            )
+                          }
+                          
+                          return (
+                            <div key={idx} onClick={!isStamped && viewingCard.tarjeta.puntos === idx ? handleSellarManualmente : undefined} className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 ${!isStamped && viewingCard.tarjeta.puntos === idx ? 'cursor-pointer hover:scale-110 ring-4 ring-amber-300 animate-pulse bg-white' : ''}`} style={{ 
+                              border: `2px solid ${primaryColor}`,
+                              backgroundColor: isStamped ? `${primaryColor}15` : 'transparent'
+                            }}>
+                              {isStamped && (
+                                <div className="w-8 h-8 rounded-full flex flex-col items-center justify-center text-white shadow-sm" style={{ backgroundColor: primaryColor }}>
+                                  <CheckCircle2 className="h-4 w-4" />
+                                </div>
+                              )}
                             </div>
-                          )}
+                          )
+                        })}
+                      </div>
+
+                      <div className="w-full bg-blue-50 text-blue-700 p-3 rounded-xl text-sm font-medium text-center border border-blue-100 mb-4">
+                        Puntos actuales: <strong>{viewingCard.tarjeta.puntos} / {meta}</strong>
+                      </div>
+
+                      {viewingCard.tarjeta.puntos >= meta ? (
+                        <div className="text-center mt-4 border-t border-gray-200 pt-4">
+                          <p className="text-sm font-bold text-green-600 mb-2">¡El cliente ha completado la tarjeta!</p>
+                          <button 
+                            onClick={handleReiniciarTarjeta}
+                            className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-xl shadow-md transition-all text-sm flex items-center justify-center w-full"
+                          >
+                            <Award className="w-4 h-4 mr-2" /> Entregar Premio y Reiniciar Tarjeta
+                          </button>
                         </div>
-                      )
-                    })}
-                  </div>
-
-                  <div className="w-full bg-blue-50 text-blue-700 p-4 rounded-xl text-sm font-medium mb-4">
-                    Cliente: <strong>{viewingCard.cita.cliente_nombre}</strong><br/>
-                    Puntos actuales: <strong>{viewingCard.tarjeta.puntos} / {meta}</strong>
-                  </div>
-
-                  <p className="text-xs text-gray-400 mt-2">
-                    Para sellar manualmente un punto, haz clic en el siguiente círculo disponible.
-                  </p>
+                      ) : (
+                        <p className="text-xs text-gray-500 mt-4 text-center">
+                          Para sellar manualmente un punto, haz clic en el siguiente círculo disponible.
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })()}

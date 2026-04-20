@@ -132,6 +132,7 @@ export default function AdminPanel() {
         instagram: negocio.instagram,
         tiktok: negocio.tiktok,
         fidelidad_puntos_meta: negocio.fidelidad_puntos_meta,
+        fidelidad_intervalo_premio: negocio.fidelidad_intervalo_premio,
         fidelidad_recompensa: negocio.fidelidad_recompensa
       }).eq('id', negocio.id).select();
       
@@ -524,15 +525,63 @@ export default function AdminPanel() {
 
             <div className="border-t pt-4">
               <h4 className="font-bold mb-4 flex items-center text-amber-500">Programa de Fidelidad</h4>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-bold mb-2">Puntos Meta (Citas necesarias para premio)</label>
-                  <input type="number" min="1" max="20" value={negocio.fidelidad_puntos_meta || 10} onChange={e => setNegocio({...negocio, fidelidad_puntos_meta: parseInt(e.target.value)})} className="w-full px-4 py-2 border rounded-xl" />
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-bold mb-2">Puntos Meta (Citas necesarias para premio)</label>
+                    <input type="number" min="1" max="20" value={negocio.fidelidad_puntos_meta || 10} onChange={e => setNegocio({...negocio, fidelidad_puntos_meta: parseInt(e.target.value) || 1})} className="w-full px-4 py-2 border rounded-xl" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold mb-2">Recompensa (Premio)</label>
+                    <input type="text" value={negocio.fidelidad_recompensa || ''} onChange={e => setNegocio({...negocio, fidelidad_recompensa: e.target.value})} className="w-full px-4 py-2 border rounded-xl" placeholder="Ej. Corte gratis en tu décima cita" />
+                    <p className="text-xs text-gray-500 mt-1">Este texto aparecerá en la tarjeta de los clientes para motivarlos a regresar.</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold mb-2">Entregar premio cada X puntos</label>
+                    <input type="number" min="0" max="20" value={negocio.fidelidad_intervalo_premio || 0} onChange={e => setNegocio({...negocio, fidelidad_intervalo_premio: parseInt(e.target.value) || 0})} className="w-full px-4 py-2 border rounded-xl" />
+                    <p className="text-xs text-gray-500 mt-1">Pon 0 si solo das premio al completar toda la tarjeta. Pon 3 para dar premios en la cita 3, 6, 9, etc.</p>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-bold mb-2">Recompensa (Premio)</label>
-                  <input type="text" value={negocio.fidelidad_recompensa || ''} onChange={e => setNegocio({...negocio, fidelidad_recompensa: e.target.value})} className="w-full px-4 py-2 border rounded-xl" placeholder="Ej. Corte gratis en tu décima cita" />
-                  <p className="text-xs text-gray-500 mt-1">Este texto aparecerá en la tarjeta de los clientes para motivarlos a regresar.</p>
+
+                <div className="bg-gray-50 p-6 rounded-2xl border border-gray-200">
+                  <h5 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 text-center">Vista Previa de la Ficha</h5>
+                  <div className="flex flex-col items-center">
+                    <div className="mb-2 text-center">
+                      <h2 className="text-lg font-black tracking-widest uppercase text-gray-900" style={{ fontFamily: 'sans-serif' }}>
+                        Tarjeta de
+                      </h2>
+                      <h3 className="text-2xl -mt-2 mb-2" style={{ fontFamily: 'cursive', color: negocio.color_primario || '#000000' }}>
+                        fidelidad
+                      </h3>
+                    </div>
+
+                    <p className="text-gray-500 font-medium tracking-wide mb-4 text-xs text-center">
+                      {negocio.fidelidad_recompensa || 'Premio sorpresa al completar tu tarjeta'}
+                    </p>
+
+                    <div className="flex flex-wrap justify-center gap-2 mb-2 w-full">
+                      {[...Array(negocio.fidelidad_puntos_meta || 10)].map((_, idx) => {
+                        const interval = negocio.fidelidad_intervalo_premio || 0;
+                        const isReward = idx === (negocio.fidelidad_puntos_meta || 10) - 1 || (interval > 0 && (idx + 1) % interval === 0);
+                        
+                        if (isReward) {
+                          return (
+                            <div key={idx} className="w-10 h-10 rounded-full flex flex-col items-center justify-center text-white font-black leading-tight shadow-md" style={{ backgroundColor: negocio.color_primario || '#000000' }}>
+                              <span className="text-[7px]">PREMIO</span>
+                            </div>
+                          )
+                        }
+                        
+                        return (
+                          <div key={idx} className="w-10 h-10 rounded-full flex items-center justify-center" style={{ 
+                            border: `2px solid ${negocio.color_primario || '#000000'}`,
+                            backgroundColor: 'transparent'
+                          }}>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
