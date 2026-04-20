@@ -49,6 +49,44 @@ export default function EmployeePanel() {
     }
   }
 
+  async function handleCancelarCita(cita) {
+    const motivo = prompt('¿Cancelar esta cita? Por favor, ingresa el motivo para notificar al cliente:');
+    if (motivo === null) return;
+
+    try {
+      await supabase.from('citas').update({ estado: 'cancelada' }).eq('id', cita.id);
+      setCitas(citas.map(c => c.id === cita.id ? { ...c, estado: 'cancelada' } : c));
+      const phone = cita.cliente_telefono ? cita.cliente_telefono.replace(/\D/g, '') : '';
+      if (phone && motivo.trim() !== '') {
+        const msg = `Hola ${cita.cliente_nombre}, lamentamos informarte que tu cita del ${cita.fecha} a las ${cita.hora.substring(0,5)} fue cancelada. Motivo: ${motivo}. ¿Deseas reprogramarla?`;
+        window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+      }
+    } catch (error) { alert('Error al cancelar'); }
+  }
+
+  async function handleCompletarCita(cita) {
+    if (!confirm('¿Marcar esta cita como completada? Si el cliente tiene cuenta, ganará 1 punto de fidelidad.')) return;
+    try {
+      await supabase.from('citas').update({ estado: 'completada' }).eq('id', cita.id);
+      setCitas(citas.map(c => c.id === cita.id ? { ...c, estado: 'completada' } : c));
+      
+      if (cita.cliente_id) {
+        const { data: tarjeta } = await supabase
+          .from('tarjetas_fidelidad')
+          .select('*')
+          .eq('cliente_id', cita.cliente_id)
+          .eq('negocio_id', cita.negocio_id)
+          .single();
+          
+        if (tarjeta) {
+          await supabase.from('tarjetas_fidelidad').update({ puntos: tarjeta.puntos + 1 }).eq('id', tarjeta.id);
+        } else {
+          await supabase.from('tarjetas_fidelidad').insert([{ cliente_id: cita.cliente_id, negocio_id: cita.negocio_id, puntos: 1 }]);
+        }
+      }
+    } catch (error) { alert('Error al completar cita'); }
+  }
+
   if (!session) return null;
 
   const todayStr = new Date().toISOString().split('T')[0];
@@ -86,8 +124,20 @@ export default function EmployeePanel() {
                         {cita.cliente_nombre} <span className="text-gray-400 font-normal ml-2">({cita.cliente_telefono})</span>
                       </p>
                     </div>
-                    <div className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0 font-medium">
-                      <p>{cita.servicios?.nombre}</p>
+                    <div className="mt-2 flex items-center justify-between sm:mt-0 font-medium sm:w-1/2">
+                      <p className="text-sm text-gray-500">{cita.servicios?.nombre}</p>
+                      <div className="flex gap-2">
+                        {cita.estado === 'pendiente' && (
+                          <button onClick={() => handleCompletarCita(cita)} className="text-xs text-green-600 hover:bg-green-50 px-2 py-1 rounded transition-colors border border-green-100 font-bold">
+                            Completar
+                          </button>
+                        )}
+                        {cita.estado !== 'cancelada' && cita.estado !== 'completada' && (
+                          <button onClick={() => handleCancelarCita(cita)} className="text-xs text-red-500 hover:bg-red-50 px-2 py-1 rounded transition-colors border border-red-100">
+                            Cancelar Cita
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </li>
@@ -105,9 +155,23 @@ export default function EmployeePanel() {
                   <div className="flex justify-between">
                     <div className="text-sm font-bold text-gray-700">{cita.fecha} a las {cita.hora.substring(0,5)}</div>
                   </div>
-                  <div className="mt-2 flex justify-between">
-                    <p className="text-sm font-bold text-gray-800">{cita.cliente_nombre}</p>
-                    <p className="text-sm text-gray-600">{cita.servicios?.nombre}</p>
+                  <div className="mt-2 flex justify-between items-center">
+                    <div>
+                      <p className="text-sm font-bold text-gray-800">{cita.cliente_nombre} <span className="text-gray-400 font-normal ml-1">({cita.cliente_telefono})</span></p>
+                      <p className="text-sm text-gray-600">{cita.servicios?.nombre}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      {cita.estado === 'pendiente' && (
+                        <button onClick={() => handleCompletarCita(cita)} className="text-xs text-green-600 hover:bg-green-50 px-2 py-1 rounded transition-colors border border-green-100 font-bold">
+                          Completar
+                        </button>
+                      )}
+                      {cita.estado !== 'cancelada' && cita.estado !== 'completada' && (
+                        <button onClick={() => handleCancelarCita(cita)} className="text-xs text-red-500 hover:bg-red-50 px-2 py-1 rounded transition-colors border border-red-100">
+                          Cancelar
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </li>
               ))}

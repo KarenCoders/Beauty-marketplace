@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase, uploadImage } from '../lib/supabase';
 import { 
   Trash2, Edit2, Plus, Calendar as CalendarIcon, 
-  Settings, Scissors, User, Map, Image as ImageIcon, CheckCircle2, X 
+  Settings, Scissors, User, Map, Image as ImageIcon, CheckCircle2, X, MessageSquare 
 } from 'lucide-react';
 
 export default function AdminPanel() {
@@ -17,6 +17,7 @@ export default function AdminPanel() {
   const [citas, setCitas] = useState([]);
   const [servicios, setServicios] = useState([]);
   const [empleados, setEmpleados] = useState([]);
+  const [comentarios, setComentarios] = useState([]);
 
   // Forms
   const [showSrvForm, setShowSrvForm] = useState(false);
@@ -57,17 +58,19 @@ export default function AdminPanel() {
   async function fetchData(negocioId) {
     setLoading(true);
     try {
-      const [nRes, cRes, sRes, eRes] = await Promise.all([
+      const [nRes, cRes, sRes, eRes, comRes] = await Promise.all([
         supabase.from('negocios').select('*').eq('id', negocioId).single(),
         supabase.from('citas').select('*, servicios(nombre), empleados(nombre)').eq('negocio_id', negocioId).order('fecha', { ascending: true }),
         supabase.from('servicios').select('*').eq('negocio_id', negocioId).order('nombre', { ascending: true }),
-        supabase.from('empleados').select('*').eq('negocio_id', negocioId).order('nombre', { ascending: true })
+        supabase.from('empleados').select('*').eq('negocio_id', negocioId).order('nombre', { ascending: true }),
+        supabase.from('comentarios').select('*').eq('negocio_id', negocioId).order('created_at', { ascending: false })
       ]);
 
       setNegocio(nRes.data);
       setCitas(cRes.data || []);
       setServicios(sRes.data || []);
       setEmpleados(eRes.data || []);
+      setComentarios(comRes.data || []);
     } catch (error) {
       console.error('Error fetching data:', error.message);
     } finally {
@@ -94,6 +97,11 @@ export default function AdminPanel() {
         const { error } = await supabase.from('negocios').update({ logo_url: url }).eq('id', negocio.id);
         if (error) throw error;
         setNegocio({ ...negocio, logo_url: url });
+      } else if (type === 'negocio_galeria') {
+        const newGaleria = [...(negocio.galeria_urls || []), url];
+        const { error } = await supabase.from('negocios').update({ galeria_urls: newGaleria }).eq('id', negocio.id);
+        if (error) throw error;
+        setNegocio({ ...negocio, galeria_urls: newGaleria });
       } else if (type === 'srv_galeria') {
         setter(prev => ({ ...prev, galeria_urls: [...(prev.galeria_urls || []), url] }));
       } else {
@@ -130,12 +138,53 @@ export default function AdminPanel() {
   };
 
   // --- CITAS ---
-  async function handleCancelarCita(id) {
-    if (!confirm('¿Cancelar esta cita?')) return;
+  async function handleCancelarCita(cita) {
+    const motivo = prompt('¿Cancelar esta cita? Por favor, ingresa el motivo para notificar al cliente:');
+    if (motivo === null) return;
+
     try {
-      await supabase.from('citas').update({ estado: 'cancelada' }).eq('id', id);
-      setCitas(citas.map(c => c.id === id ? { ...c, estado: 'cancelada' } : c));
-    } catch (error) { alert('Error'); }
+      await supabase.from('citas').update({ estado: 'cancelada' }).eq('id', cita.id);
+      setCitas(citas.map(c => c.id === cita.id ? { ...c, estado: 'cancelada' } : c));
+      
+      const phone = cita.cliente_telefono ? cita.cliente_telefono.replace(/\D/g, '') : '';
+      if (phone && motivo.trim() !== '') {
+        const msg = `Hola ${cita.cliente_nombre}, lamentamos informarte que tu cita del ${cita.fecha} a las ${cita.hora.substring(0,5)} fue cancelada. Motivo: ${motivo}. ¿Deseas reprogramarla?`;
+        window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+      }
+    } catch (error) { alert('Error al cancelar'); }
+  }
+
+  async function handleCompletarCita(cita) {
+    if (!confirm('¿Marcar esta cita como completada? Si el cliente tiene cuenta, ganará 1 punto de fidelidad.')) return;
+    try {
+      await supabase.from('citas').update({ estado: 'completada' }).eq('id', cita.id);
+      setCitas(citas.map(c => c.id === cita.id ? { ...c, estado: 'completada' } : c));
+      
+      if (cita.cliente_id) {
+        const { data: tarjeta } = await supabase
+          .from('tarjetas_fidelidad')
+          .select('*')
+          .eq('cliente_id', cita.cliente_id)
+          .eq('negocio_id', negocio.id)
+          .single();
+          
+        if (tarjeta) {
+          await supabase.from('tarjetas_fidelidad').update({ puntos: tarjeta.puntos + 1 }).eq('id', tarjeta.id);
+        } else {
+          await supabase.from('tarjetas_fidelidad').insert([{ cliente_id: cita.cliente_id, negocio_id: negocio.id, puntos: 1 }]);
+        }
+      }
+    } catch (error) { alert('Error al completar cita'); }
+  }
+
+  // --- COMENTARIOS ---
+  async function handleEliminarComentario(id) {
+    if (!confirm('¿Estás seguro de eliminar esta reseña del cliente?')) return;
+    try {
+      const { error } = await supabase.from('comentarios').delete().eq('id', id);
+      if (error) throw error;
+      setComentarios(comentarios.filter(c => c.id !== id));
+    } catch (err) { alert('Error al eliminar'); }
   }
 
   // --- SERVICIOS ---
@@ -216,6 +265,9 @@ export default function AdminPanel() {
           <button onClick={() => setActiveTab('config')} className={`py-4 px-1 border-b-2 font-bold text-sm flex items-center ${activeTab === 'config' ? 'border-theme-primary text-theme-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
             <Settings className="mr-2 h-5 w-5" /> Configuración
           </button>
+          <button onClick={() => setActiveTab('comentarios')} className={`py-4 px-1 border-b-2 font-bold text-sm flex items-center ${activeTab === 'comentarios' ? 'border-theme-primary text-theme-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+            <MessageSquare className="mr-2 h-5 w-5" /> Reseñas
+          </button>
         </nav>
       </div>
 
@@ -239,9 +291,21 @@ export default function AdminPanel() {
                   <td className="px-6 py-4"><div className="font-bold">{cita.fecha}</div><div className="text-sm text-theme-primary">{cita.hora.substring(0,5)}</div></td>
                   <td className="px-6 py-4"><div className="font-bold">{cita.cliente_nombre}</div><div className="text-sm text-gray-500">{cita.cliente_telefono}</div></td>
                   <td className="px-6 py-4 text-sm text-gray-500">{cita.servicios?.nombre}<br/><span className="text-xs">con {cita.empleados?.nombre}</span></td>
-                  <td className="px-6 py-4"><span className="px-2 py-1 bg-gray-100 rounded-md text-xs font-bold">{cita.estado}</span></td>
-                  <td className="px-6 py-4 text-right">
-                    {cita.estado !== 'cancelada' && <button onClick={() => handleCancelarCita(cita.id)} className="text-red-500 hover:bg-red-50 p-2 rounded">Cancelar</button>}
+                  <td className="px-6 py-4">
+                    <span className={`px-2 py-1 rounded-md text-xs font-bold ${
+                      cita.estado === 'completada' ? 'bg-green-100 text-green-700' :
+                      cita.estado === 'cancelada' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'
+                    }`}>
+                      {cita.estado}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right flex gap-2 justify-end">
+                    {cita.estado !== 'cancelada' && cita.estado !== 'completada' && (
+                      <>
+                        <button onClick={() => handleCompletarCita(cita)} className="text-green-600 hover:bg-green-50 px-2 py-1 rounded font-bold transition-colors">Completar</button>
+                        <button onClick={() => handleCancelarCita(cita)} className="text-red-500 hover:bg-red-50 px-2 py-1 rounded font-bold transition-colors">Cancelar</button>
+                      </>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -417,6 +481,79 @@ export default function AdminPanel() {
               <p className="text-xs text-gray-500 mt-3">Sube tu logo para que se muestre en tu página. Require el Bucket "imagenes" en Supabase.</p>
             </div>
           </div>
+
+          <div className="bg-white p-6 rounded-2xl border border-gray-200 md:col-span-2">
+            <h3 className="font-bold text-xl mb-4 flex items-center"><ImageIcon className="mr-2 h-5 w-5"/> Galería de Trabajos (Carrusel Principal)</h3>
+            <div className="flex gap-2 mb-4">
+              <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'negocio_galeria')} className="text-sm border rounded p-1 w-full max-w-sm" />
+              {uploadingObj === 'negocio_galeria' && <span className="text-sm text-gray-500 self-center font-bold">Subiendo...</span>}
+            </div>
+            {negocio.galeria_urls && negocio.galeria_urls.length > 0 ? (
+              <div className="flex flex-wrap gap-4 mt-4">
+                {negocio.galeria_urls.map((url, idx) => (
+                  <div key={idx} className="relative h-24 w-24 group">
+                    <img src={url} alt="" className="h-full w-full object-cover rounded-lg shadow-sm border border-gray-200" />
+                    <button type="button" onClick={async () => {
+                      if (!confirm('¿Eliminar esta imagen de la galería?')) return;
+                      const newGaleria = negocio.galeria_urls.filter((_, i) => i !== idx);
+                      try {
+                        await supabase.from('negocios').update({ galeria_urls: newGaleria }).eq('id', negocio.id);
+                        setNegocio({...negocio, galeria_urls: newGaleria});
+                      } catch(err) { alert('Error eliminando'); }
+                    }} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow opacity-0 group-hover:opacity-100 transition-opacity">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-500 text-sm">Aún no has subido imágenes a la galería del negocio.</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TABS: COMENTARIOS */}
+      {activeTab === 'comentarios' && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="p-6 border-b border-gray-200">
+            <h2 className="text-xl font-bold">Gestión de Reseñas</h2>
+            <p className="text-gray-500 text-sm">Administra los comentarios que han dejado tus clientes en tu página.</p>
+          </div>
+          {comentarios.length === 0 ? (
+            <div className="p-8 text-center text-gray-500 font-medium border-t border-dashed border-gray-200">Aún no hay reseñas en tu negocio.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200 text-sm">
+                    <th className="px-6 py-4 font-bold text-gray-700">Cliente</th>
+                    <th className="px-6 py-4 font-bold text-gray-700">Calificación</th>
+                    <th className="px-6 py-4 font-bold text-gray-700">Comentario</th>
+                    <th className="px-6 py-4 font-bold text-gray-700">Fecha</th>
+                    <th className="px-6 py-4 font-bold text-gray-700 text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {comentarios.map(c => (
+                    <tr key={c.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 font-bold text-gray-900">{c.nombre}</td>
+                      <td className="px-6 py-4 text-amber-400 text-lg">{'★'.repeat(c.calificacion)}<span className="text-gray-200">{'★'.repeat(5-c.calificacion)}</span></td>
+                      <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
+                        <div className="line-clamp-2" title={c.texto}>{c.texto}</div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500">{new Date(c.created_at).toLocaleDateString()}</td>
+                      <td className="px-6 py-4 text-right">
+                        <button onClick={() => handleEliminarComentario(c.id)} className="text-red-500 font-bold hover:bg-red-50 px-3 py-2 rounded-lg transition-colors border border-transparent hover:border-red-100 text-sm">
+                          Eliminar
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -5,11 +5,16 @@ import BusinessPage from './pages/BusinessPage';
 import Login from './pages/Login';
 import AdminPanel from './pages/AdminPanel';
 import EmployeePanel from './pages/EmployeePanel';
+import SuperAdminPanel from './pages/SuperAdminPanel';
+import ClientPanel from './pages/ClientPanel';
+import NotFound from './pages/NotFound';
+import OfflineBanner from './components/OfflineBanner';
 
 function App() {
   return (
     <Router>
       <div className="min-h-screen flex flex-col">
+        <OfflineBanner />
         <Navbar />
         <main className="flex-grow">
           <Routes>
@@ -18,6 +23,9 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/admin" element={<AdminPanel />} />
             <Route path="/empleado" element={<EmployeePanel />} />
+            <Route path="/cliente" element={<ClientPanel />} />
+            <Route path="/superadmin" element={<SuperAdminPanel />} />
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </main>
       </div>

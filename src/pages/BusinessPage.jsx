@@ -3,12 +3,12 @@ import { useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { 
   Clock, DollarSign, MapPin, Phone, Calendar as CalendarIcon, 
-  User, ChevronRight, CheckCircle2, X, ChevronLeft 
+  User, ChevronRight, CheckCircle2, X, ChevronLeft, MessageSquare 
 } from 'lucide-react';
 import { 
   format, addMonths, subMonths, startOfMonth, endOfMonth, 
   startOfWeek, endOfWeek, isSameMonth, isSameDay, eachDayOfInterval, 
-  isBefore, startOfDay, parseISO 
+  isBefore, startOfDay, parseISO, addDays 
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -17,7 +17,11 @@ export default function BusinessPage() {
   const [negocio, setNegocio] = useState(null);
   const [servicios, setServicios] = useState([]);
   const [empleados, setEmpleados] = useState([]);
+  const [comentarios, setComentarios] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Global Gallery
+  const [globalGalleryIndex, setGlobalGalleryIndex] = useState(0);
 
   // Modal & Booking State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -29,10 +33,33 @@ export default function BusinessPage() {
   const [selectedTime, setSelectedTime] = useState('');
   const [clienteNombre, setClienteNombre] = useState('');
   const [clienteTelefono, setClienteTelefono] = useState('');
+  const [sessionUser, setSessionUser] = useState(null);
   
   const [availableTimes, setAvailableTimes] = useState([]);
+  const [citasDelDia, setCitasDelDia] = useState([]);
   const [bookingLoading, setBookingLoading] = useState(false);
   const [step, setStep] = useState(1); // 1: Info/Fecha, 2: Datos Cliente, 3: Success
+
+  // Comments State
+  const [newComment, setNewComment] = useState({ nombre: '', texto: '', calificacion: 5 });
+  const [misComentarios, setMisComentarios] = useState([]);
+  const [editingCommentId, setEditingCommentId] = useState(null);
+
+  // Load user's comments from local storage
+  useEffect(() => {
+    const guardados = JSON.parse(localStorage.getItem('mis_comentarios') || '[]');
+    setMisComentarios(guardados);
+
+    const s = localStorage.getItem('session');
+    if (s) {
+      const sess = JSON.parse(s);
+      if (sess.role === 'cliente') {
+        setSessionUser(sess);
+        setClienteNombre(sess.nombre || '');
+        setClienteTelefono(sess.telefono || '');
+      }
+    }
+  }, []);
 
   // Calendar State
   const today = startOfDay(new Date());
@@ -49,22 +76,19 @@ export default function BusinessPage() {
     }
   }, [negocio]);
 
-  // Si hay un solo empleado, seleccionarlo automáticamente
+  // Fetchear horas cuando haya fecha seleccionada
   useEffect(() => {
-    if (empleados.length === 1 && !selectedEmployee) {
-      setSelectedEmployee(empleados[0].id);
-    }
-  }, [empleados, selectedEmployee]);
-
-  // Fetchear horas cuando haya fecha y empleado seleccionado
-  useEffect(() => {
-    if (selectedDate && selectedEmployee) {
+    if (selectedDate) {
       fetchAvailableTimes();
+      setSelectedTime('');
+      setSelectedEmployee('');
     } else {
       setAvailableTimes([]);
       setSelectedTime('');
+      setSelectedEmployee('');
+      setCitasDelDia([]);
     }
-  }, [selectedDate, selectedEmployee]);
+  }, [selectedDate]);
 
   async function fetchBusinessData() {
     try {
@@ -76,16 +100,19 @@ export default function BusinessPage() {
       if (nError) throw nError;
       setNegocio(nData);
 
-      const [sRes, eRes] = await Promise.all([
+      const [sRes, eRes, cRes] = await Promise.all([
         supabase.from('servicios').select('*').eq('negocio_id', nData.id),
-        supabase.from('empleados').select('*').eq('negocio_id', nData.id)
+        supabase.from('empleados').select('*').eq('negocio_id', nData.id),
+        supabase.from('comentarios').select('*').eq('negocio_id', nData.id).order('created_at', { ascending: false })
       ]);
 
       if (sRes.error) throw sRes.error;
       if (eRes.error) throw eRes.error;
+      // Ignores comments error if table doesn't exist yet to prevent breaking
 
       setServicios(sRes.data || []);
       setEmpleados(eRes.data || []);
+      setComentarios(cRes.data || []);
     } catch (error) {
       console.error('Error fetching data:', error.message);
     } finally {
@@ -105,15 +132,18 @@ export default function BusinessPage() {
       const formattedDate = format(selectedDate, 'yyyy-MM-dd');
       const { data, error } = await supabase
         .from('citas')
-        .select('hora')
-        .eq('empleado_id', selectedEmployee)
+        .select('hora, empleado_id')
+        .eq('negocio_id', negocio.id)
         .eq('fecha', formattedDate)
         .in('estado', ['pendiente', 'confirmada']);
 
       if (error) throw error;
+      setCitasDelDia(data || []);
 
-      const bookedTimes = data.map(cita => cita.hora);
-      const freeTimes = allTimes.filter(t => !bookedTimes.includes(t));
+      const freeTimes = allTimes.filter(t => {
+        const busyCount = data.filter(c => c.hora === t).length;
+        return busyCount < empleados.length;
+      });
       setAvailableTimes(freeTimes);
     } catch (error) {
       console.error('Error fetching times:', error);
@@ -126,8 +156,8 @@ export default function BusinessPage() {
     setStep(1);
     setSelectedDate(null);
     setSelectedTime('');
-    // El empleado se autoselecciona arriba si solo hay 1
-    if (empleados.length > 1) setSelectedEmployee(''); 
+    setSelectedEmployee('');
+    setCitasDelDia([]);
     setIsModalOpen(true);
     document.body.style.overflow = 'hidden'; // Evitar scroll de fondo
   }
@@ -150,6 +180,7 @@ export default function BusinessPage() {
           negocio_id: negocio.id,
           servicio_id: selectedService.id,
           empleado_id: selectedEmployee,
+          cliente_id: sessionUser ? sessionUser.id : null,
           fecha: formattedDate,
           hora: selectedTime,
           cliente_nombre: clienteNombre,
@@ -177,6 +208,56 @@ export default function BusinessPage() {
       alert('Hubo un error al agendar la cita.');
     } finally {
       setBookingLoading(false);
+    }
+  }
+
+  async function handleSubmitComment(e) {
+    e.preventDefault();
+    if (!newComment.nombre || !newComment.texto || !newComment.calificacion) return;
+    try {
+      if (editingCommentId) {
+        const { error } = await supabase.from('comentarios').update({
+          nombre: newComment.nombre,
+          texto: newComment.texto,
+          calificacion: newComment.calificacion
+        }).eq('id', editingCommentId);
+        if (error) throw error;
+        
+        setComentarios(comentarios.map(c => c.id === editingCommentId ? { ...c, ...newComment } : c));
+        setEditingCommentId(null);
+      } else {
+        const { data, error } = await supabase.from('comentarios').insert([{
+          negocio_id: negocio.id,
+          ...newComment
+        }]).select();
+        if (error) throw error;
+        
+        const newId = data[0].id;
+        setComentarios([data[0], ...comentarios]);
+        const updatedMis = [...misComentarios, newId];
+        setMisComentarios(updatedMis);
+        localStorage.setItem('mis_comentarios', JSON.stringify(updatedMis));
+      }
+      setNewComment({ nombre: '', texto: '', calificacion: 5 });
+    } catch (err) {
+      alert('Error al guardar el comentario.');
+    }
+  }
+
+  async function handleDeleteComment(id) {
+    if (!confirm('¿Estás seguro de eliminar este comentario?')) return;
+    try {
+      await supabase.from('comentarios').delete().eq('id', id);
+      setComentarios(comentarios.filter(c => c.id !== id));
+      const updatedMis = misComentarios.filter(cId => cId !== id);
+      setMisComentarios(updatedMis);
+      localStorage.setItem('mis_comentarios', JSON.stringify(updatedMis));
+      if (editingCommentId === id) {
+        setEditingCommentId(null);
+        setNewComment({ nombre: '', texto: '', calificacion: 5 });
+      }
+    } catch (err) {
+      alert('Error al eliminar');
     }
   }
 
@@ -246,9 +327,7 @@ export default function BusinessPage() {
             </button>
           </div>
         );
-        day = addMonths(day, 1); // Helper to add 1 day, wait addDays(day, 1) is needed but I imported addMonths. Let's fix this inline.
-        // JS Date add day:
-        day = new Date(day.getTime() + 86400000);
+        day = addDays(day, 1);
       }
       rows.push(<div className="grid grid-cols-7" key={day}>{days}</div>);
       days = [];
@@ -320,6 +399,43 @@ export default function BusinessPage() {
           </div>
         </div>
       </div>
+
+      {/* Carrusel de Galería Global */}
+      {negocio.galeria_urls && negocio.galeria_urls.length > 0 && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 mb-8">
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight">Nuestros Trabajos</h2>
+          </div>
+          <div className="relative w-full h-64 md:h-[32rem] rounded-[2rem] overflow-hidden bg-gray-100 shadow-2xl group border border-gray-200">
+            <img 
+              src={negocio.galeria_urls[globalGalleryIndex]} 
+              className="w-full h-full object-cover transition-opacity duration-500" 
+              alt="Galería del negocio" 
+            />
+            {negocio.galeria_urls.length > 1 && (
+              <>
+                <button 
+                  onClick={() => setGlobalGalleryIndex(prev => prev === 0 ? negocio.galeria_urls.length - 1 : prev - 1)}
+                  className="absolute left-6 top-1/2 -translate-y-1/2 bg-white/50 hover:bg-white text-gray-900 p-3 rounded-full backdrop-blur-md shadow-lg transition-all transform hover:scale-110 opacity-0 group-hover:opacity-100"
+                >
+                  <ChevronLeft className="h-6 w-6" />
+                </button>
+                <button 
+                  onClick={() => setGlobalGalleryIndex(prev => prev === negocio.galeria_urls.length - 1 ? 0 : prev + 1)}
+                  className="absolute right-6 top-1/2 -translate-y-1/2 bg-white/50 hover:bg-white text-gray-900 p-3 rounded-full backdrop-blur-md shadow-lg transition-all transform hover:scale-110 opacity-0 group-hover:opacity-100"
+                >
+                  <ChevronRight className="h-6 w-6" />
+                </button>
+                <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-2">
+                  {negocio.galeria_urls.map((_, idx) => (
+                    <button key={idx} onClick={() => setGlobalGalleryIndex(idx)} className={`h-2.5 rounded-full transition-all shadow-sm ${idx === globalGalleryIndex ? 'w-8 bg-white' : 'w-2.5 bg-white/50 hover:bg-white/80'}`}></button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 mt-12">
         <div className="flex items-center justify-between mb-8">
@@ -408,6 +524,97 @@ export default function BusinessPage() {
         )}
       </div>
 
+      {/* Sección de Comentarios */}
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 mt-16 mb-24">
+        <h2 className="text-3xl font-extrabold text-gray-900 mb-8 flex items-center">
+          <MessageSquare className="mr-3 h-8 w-8 text-theme-primary" /> Reseñas de Clientes
+        </h2>
+        
+        <div className="grid md:grid-cols-3 gap-8">
+          <div className="md:col-span-1">
+            <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 sticky top-24">
+              <h3 className="font-bold text-lg mb-4 text-gray-900">{editingCommentId ? 'Editar tu reseña' : 'Deja tu reseña'}</h3>
+              <form onSubmit={handleSubmitComment} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Tu Nombre</label>
+                  <input required type="text" value={newComment.nombre} onChange={e=>setNewComment({...newComment, nombre: e.target.value})} className="w-full p-3 border-2 border-gray-100 rounded-xl focus:border-theme-primary outline-none" placeholder="Ej. Ana Gómez" />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Calificación</label>
+                  <div className="flex gap-1">
+                    {[1,2,3,4,5].map(star => (
+                      <button type="button" key={star} onClick={() => setNewComment({...newComment, calificacion: star})} className={`text-2xl transition-transform hover:scale-110 ${newComment.calificacion >= star ? 'text-amber-400' : 'text-gray-200'}`}>
+                        ★
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Comentario</label>
+                  <textarea required value={newComment.texto} onChange={e=>setNewComment({...newComment, texto: e.target.value})} className="w-full p-3 border-2 border-gray-100 rounded-xl focus:border-theme-primary outline-none" rows="3" placeholder="¿Cómo fue tu experiencia?"></textarea>
+                </div>
+                <div className="flex gap-2">
+                  <button type="submit" className="flex-1 py-3 bg-theme-primary text-white font-bold rounded-xl shadow-lg shadow-theme-primary/30 hover:opacity-90 transition-opacity">
+                    {editingCommentId ? 'Guardar Cambios' : 'Publicar Reseña'}
+                  </button>
+                  {editingCommentId && (
+                    <button type="button" onClick={() => {
+                      setEditingCommentId(null);
+                      setNewComment({ nombre: '', texto: '', calificacion: 5 });
+                    }} className="py-3 px-4 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-colors">
+                      Cancelar
+                    </button>
+                  )}
+                </div>
+              </form>
+            </div>
+          </div>
+          
+          <div className="md:col-span-2 space-y-4">
+            {comentarios.length === 0 ? (
+              <div className="bg-white p-8 rounded-3xl border border-dashed border-gray-200 text-center text-gray-500 font-medium">
+                Aún no hay reseñas. ¡Sé el primero en comentar!
+              </div>
+            ) : (
+              comentarios.map(comentario => (
+                <div key={comentario.id} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                  <div className="flex justify-between items-start mb-2">
+                    <h4 className="font-bold text-gray-900">{comentario.nombre}</h4>
+                    <div className="flex text-amber-400 text-sm">
+                      {[...Array(5)].map((_, i) => (
+                        <span key={i}>{i < comentario.calificacion ? '★' : <span className="text-gray-200">★</span>}</span>
+                      ))}
+                    </div>
+                  </div>
+                  <p className="text-gray-600 text-sm mb-3 leading-relaxed">{comentario.texto}</p>
+                  <span className="text-xs text-gray-400 font-medium">{new Date(comentario.created_at).toLocaleDateString()}</span>
+                  
+                  {misComentarios.includes(comentario.id) && (
+                    <div className="mt-4 pt-3 border-t border-gray-100 flex gap-4">
+                      <button 
+                        onClick={() => {
+                          setEditingCommentId(comentario.id);
+                          setNewComment({ nombre: comentario.nombre, texto: comentario.texto, calificacion: comentario.calificacion });
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }} 
+                        className="text-xs text-theme-primary font-bold hover:underline"
+                      >
+                        Editar
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteComment(comentario.id)} 
+                        className="text-xs text-red-500 font-bold hover:underline"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* MODAL DE RESERVA */}
       {isModalOpen && selectedService && (
@@ -480,12 +687,53 @@ export default function BusinessPage() {
                   </div>
                 )}
 
-                {/* Paso 1: Especialista */}
-                {empleados.length > 1 && (
-                  <div className="mb-8">
+                {/* Paso 1: Calendario */}
+                {empleados.length > 0 && (
+                  <div className="mb-8 bg-gray-50 p-4 sm:p-6 rounded-2xl border border-gray-100">
+                    <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center"><CalendarIcon className="h-5 w-5 mr-2 text-theme-primary" /> Selecciona la Fecha</h3>
+                    <div className="bg-white p-4 rounded-xl shadow-sm">
+                      {renderHeader()}
+                      {renderDays()}
+                      {renderCells()}
+                    </div>
+                  </div>
+                )}
+
+                {/* Paso 2: Horas */}
+                {selectedDate && (
+                  <div className="mb-8 animate-in fade-in slide-in-from-bottom-4">
+                    <h3 className="text-lg font-bold text-gray-900 mb-3 flex items-center"><Clock className="h-5 w-5 mr-2 text-theme-primary" /> Horarios Disponibles</h3>
+                    <div className="grid grid-cols-4 gap-2">
+                      {availableTimes.length === 0 ? (
+                        <div className="col-span-4 text-center py-4 text-sm text-red-500 font-medium bg-red-50 rounded-lg">
+                          No hay disponibilidad para este día.
+                        </div>
+                      ) : (
+                        availableTimes.map(time => (
+                          <button
+                            type="button"
+                            key={time}
+                            onClick={() => { setSelectedTime(time); setSelectedEmployee(''); }}
+                            className={`py-2 px-1 text-sm font-bold rounded-xl transition-all ${
+                              selectedTime === time 
+                                ? 'bg-theme-primary text-white shadow-lg transform scale-105 ring-2 ring-theme-primary ring-offset-1' 
+                                : 'bg-white border border-gray-200 text-gray-700 hover:border-theme-primary hover:text-theme-primary'
+                            }`}
+                          >
+                            {time.substring(0,5)}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Paso 3: Especialista */}
+                {selectedTime && (
+                  <div className="mb-8 animate-in fade-in slide-in-from-bottom-4">
                     <h3 className="text-lg font-bold text-gray-900 mb-3 flex items-center"><User className="h-5 w-5 mr-2 text-theme-primary" /> Elige a tu Especialista</h3>
                     <div className="grid grid-cols-2 gap-3">
-                      {empleados.map(emp => (
+                      {empleados.filter(e => !citasDelDia.some(c => c.empleado_id === e.id && c.hora === selectedTime)).map(emp => (
                         <button
                           type="button"
                           key={emp.id}
@@ -508,47 +756,6 @@ export default function BusinessPage() {
                   </div>
                 )}
 
-                {/* Paso 2: Calendario */}
-                {(empleados.length === 1 || selectedEmployee) && (
-                  <div className="mb-8 bg-gray-50 p-4 sm:p-6 rounded-2xl border border-gray-100">
-                    <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center"><CalendarIcon className="h-5 w-5 mr-2 text-theme-primary" /> Selecciona la Fecha</h3>
-                    <div className="bg-white p-4 rounded-xl shadow-sm">
-                      {renderHeader()}
-                      {renderDays()}
-                      {renderCells()}
-                    </div>
-                  </div>
-                )}
-
-                {/* Paso 3: Horas */}
-                {selectedDate && selectedEmployee && (
-                  <div className="mb-8 animate-in fade-in slide-in-from-bottom-4">
-                    <h3 className="text-lg font-bold text-gray-900 mb-3 flex items-center"><Clock className="h-5 w-5 mr-2 text-theme-primary" /> Horarios Disponibles</h3>
-                    <div className="grid grid-cols-4 gap-2">
-                      {availableTimes.length === 0 ? (
-                        <div className="col-span-4 text-center py-4 text-sm text-red-500 font-medium bg-red-50 rounded-lg">
-                          No hay disponibilidad para este día.
-                        </div>
-                      ) : (
-                        availableTimes.map(time => (
-                          <button
-                            type="button"
-                            key={time}
-                            onClick={() => setSelectedTime(time)}
-                            className={`py-2 px-1 text-sm font-bold rounded-xl transition-all ${
-                              selectedTime === time 
-                                ? 'bg-theme-primary text-white shadow-lg transform scale-105 ring-2 ring-theme-primary ring-offset-1' 
-                                : 'bg-white border border-gray-200 text-gray-700 hover:border-theme-primary hover:text-theme-primary'
-                            }`}
-                          >
-                            {time.substring(0,5)}
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                )}
-
                 <button
                   type="button"
                   disabled={!selectedTime}
@@ -558,9 +765,9 @@ export default function BusinessPage() {
                   }`}
                 >
                   {empleados.length === 0 ? 'Reserva no disponible' : 
-                   !selectedEmployee ? 'Elige un especialista primero' : 
                    !selectedDate ? 'Selecciona una fecha' : 
                    !selectedTime ? 'Selecciona un horario' : 
+                   !selectedEmployee ? 'Elige un especialista' : 
                    'Continuar Reserva'} 
                   {selectedTime && <ChevronRight className="ml-2 h-5 w-5" />}
                 </button>
