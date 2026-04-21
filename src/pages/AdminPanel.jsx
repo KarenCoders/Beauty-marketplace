@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase, uploadImage } from '../lib/supabase';
-import { 
-  Trash2, Edit2, Plus, Calendar as CalendarIcon, 
-  Settings, Scissors, User, Map, Image as ImageIcon, CheckCircle2, X, MessageSquare 
+import {
+  Trash2, Edit2, Plus, Calendar as CalendarIcon,
+  Settings, Scissors, User, Map, Image as ImageIcon, CheckCircle2, X, MessageSquare
 } from 'lucide-react';
 
 export default function AdminPanel() {
@@ -37,13 +37,13 @@ export default function AdminPanel() {
       navigate('/login');
       return;
     }
-    
+
     const sess = JSON.parse(sessionStr);
     if (sess.role !== 'admin') {
       navigate('/login');
       return;
     }
-    
+
     setSession(sess);
     fetchData(sess.id);
   }, [navigate]);
@@ -92,7 +92,7 @@ export default function AdminPanel() {
     try {
       const folder = type === 'logo' ? 'logos' : type === 'emp' ? 'empleados' : 'servicios';
       const url = await uploadImage(file, folder);
-      
+
       if (type === 'logo') {
         const { error } = await supabase.from('negocios').update({ logo_url: url }).eq('id', negocio.id);
         if (error) throw error;
@@ -135,10 +135,10 @@ export default function AdminPanel() {
         fidelidad_intervalo_premio: negocio.fidelidad_intervalo_premio,
         fidelidad_recompensa: negocio.fidelidad_recompensa
       }).eq('id', negocio.id).select();
-      
+
       if (error) throw error;
       if (!data || data.length === 0) throw new Error('No se actualizó ningún registro. (Posible problema de permisos RLS o ID incorrecto).');
-      
+
       alert('Configuración guardada con éxito.');
     } catch (err) {
       console.error('Error config:', err);
@@ -154,10 +154,10 @@ export default function AdminPanel() {
     try {
       await supabase.from('citas').update({ estado: 'cancelada' }).eq('id', cita.id);
       setCitas(citas.map(c => c.id === cita.id ? { ...c, estado: 'cancelada' } : c));
-      
+
       const phone = cita.cliente_telefono ? cita.cliente_telefono.replace(/\D/g, '') : '';
       if (phone && motivo.trim() !== '') {
-        const msg = `Hola ${cita.cliente_nombre}, lamentamos informarte que tu cita del ${cita.fecha} a las ${cita.hora.substring(0,5)} fue cancelada. Motivo: ${motivo}. ¿Deseas reprogramarla?`;
+        const msg = `Hola ${cita.cliente_nombre}, lamentamos informarte que tu cita del ${cita.fecha} a las ${cita.hora.substring(0, 5)} fue cancelada. Motivo: ${motivo}. ¿Deseas reprogramarla?`;
         window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
       }
     } catch (error) { alert('Error al cancelar'); }
@@ -168,7 +168,7 @@ export default function AdminPanel() {
     try {
       await supabase.from('citas').update({ estado: 'completada' }).eq('id', cita.id);
       setCitas(citas.map(c => c.id === cita.id ? { ...c, estado: 'completada' } : c));
-      
+
       if (cita.cliente_id) {
         const { data: tarjeta } = await supabase
           .from('tarjetas_fidelidad')
@@ -176,7 +176,7 @@ export default function AdminPanel() {
           .eq('cliente_id', cita.cliente_id)
           .eq('negocio_id', negocio.id)
           .single();
-          
+
         if (tarjeta) {
           await supabase.from('tarjetas_fidelidad').update({ puntos: tarjeta.puntos + 1 }).eq('id', tarjeta.id);
         } else {
@@ -190,10 +190,10 @@ export default function AdminPanel() {
     try {
       await supabase.from('citas').update({ estado: 'confirmada' }).eq('id', cita.id);
       setCitas(citas.map(c => c.id === cita.id ? { ...c, estado: 'confirmada' } : c));
-      
+
       const phone = cita.cliente_telefono ? cita.cliente_telefono.replace(/\D/g, '') : '';
       if (phone) {
-        const msg = `¡Hola ${cita.cliente_nombre}! Tu cita para el ${cita.fecha} a las ${cita.hora.substring(0,5)} ha sido confirmada. ¡Te esperamos!`;
+        const msg = `¡Hola ${cita.cliente_nombre}! Tu cita para el ${cita.fecha} a las ${cita.hora.substring(0, 5)} ha sido confirmada. ¡Te esperamos!`;
         window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
       }
     } catch (error) { alert('Error al confirmar'); }
@@ -211,7 +211,7 @@ export default function AdminPanel() {
 
   // --- SERVICIOS ---
   function openSrvForm(servicio = null) {
-    if (servicio) { setFormSrv({...servicio, galeria_urls: servicio.galeria_urls || []}); setEditingSrvId(servicio.id); }
+    if (servicio) { setFormSrv({ ...servicio, galeria_urls: servicio.galeria_urls || [] }); setEditingSrvId(servicio.id); }
     else { setFormSrv({ nombre: '', precio: '', duracion_min: '', descripcion: '', imagen_url: '', galeria_urls: [] }); setEditingSrvId(null); }
     setShowSrvForm(true);
   }
@@ -310,15 +310,14 @@ export default function AdminPanel() {
             <tbody className="divide-y divide-gray-200">
               {citas.map((cita) => (
                 <tr key={cita.id}>
-                  <td className="px-6 py-4"><div className="font-bold">{cita.fecha}</div><div className="text-sm text-theme-primary">{cita.hora.substring(0,5)}</div></td>
+                  <td className="px-6 py-4"><div className="font-bold">{cita.fecha}</div><div className="text-sm text-theme-primary">{cita.hora.substring(0, 5)}</div></td>
                   <td className="px-6 py-4"><div className="font-bold">{cita.cliente_nombre}</div><div className="text-sm text-gray-500">{cita.cliente_telefono}</div></td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{cita.servicios?.nombre}<br/><span className="text-xs">con {cita.empleados?.nombre}</span></td>
+                  <td className="px-6 py-4 text-sm text-gray-500">{cita.servicios?.nombre}<br /><span className="text-xs">con {cita.empleados?.nombre}</span></td>
                   <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded-md text-xs font-bold ${
-                      cita.estado === 'completada' ? 'bg-green-100 text-green-700' :
+                    <span className={`px-2 py-1 rounded-md text-xs font-bold ${cita.estado === 'completada' ? 'bg-green-100 text-green-700' :
                       cita.estado === 'confirmada' ? 'bg-blue-100 text-blue-700' :
-                      cita.estado === 'cancelada' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'
-                    }`}>
+                        cita.estado === 'cancelada' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'
+                      }`}>
                       {cita.estado}
                     </span>
                   </td>
@@ -349,9 +348,9 @@ export default function AdminPanel() {
 
           {showSrvForm && (
             <form onSubmit={handleSaveSrv} className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100 mb-8 grid grid-cols-2 gap-4">
-              <div><label className="block text-sm font-bold mb-1">Nombre</label><input required type="text" value={formSrv.nombre} onChange={e=>setFormSrv({...formSrv,nombre:e.target.value})} className="w-full p-2 border rounded" /></div>
-              <div><label className="block text-sm font-bold mb-1">Precio ($)</label><input required type="number" value={formSrv.precio} onChange={e=>setFormSrv({...formSrv,precio:e.target.value})} className="w-full p-2 border rounded" /></div>
-              <div><label className="block text-sm font-bold mb-1">Duración (min)</label><input required type="number" value={formSrv.duracion_min} onChange={e=>setFormSrv({...formSrv,duracion_min:e.target.value})} className="w-full p-2 border rounded" /></div>
+              <div><label className="block text-sm font-bold mb-1">Nombre</label><input required type="text" value={formSrv.nombre} onChange={e => setFormSrv({ ...formSrv, nombre: e.target.value })} className="w-full p-2 border rounded" /></div>
+              <div><label className="block text-sm font-bold mb-1">Precio ($)</label><input required type="number" value={formSrv.precio} onChange={e => setFormSrv({ ...formSrv, precio: e.target.value })} className="w-full p-2 border rounded" /></div>
+              <div><label className="block text-sm font-bold mb-1">Duración (min)</label><input required type="number" value={formSrv.duracion_min} onChange={e => setFormSrv({ ...formSrv, duracion_min: e.target.value })} className="w-full p-2 border rounded" /></div>
               <div>
                 <label className="block text-sm font-bold mb-1">Subir Imagen</label>
                 <div className="flex gap-2">
@@ -359,9 +358,9 @@ export default function AdminPanel() {
                   {uploadingObj === 'srv' && <span className="text-xs text-gray-500 self-center">Subiendo...</span>}
                 </div>
               </div>
-              <div className="col-span-2"><label className="block text-sm font-bold mb-1">Descripción</label><textarea value={formSrv.descripcion} onChange={e=>setFormSrv({...formSrv,descripcion:e.target.value})} className="w-full p-2 border rounded" rows="2"></textarea></div>
+              <div className="col-span-2"><label className="block text-sm font-bold mb-1">Descripción</label><textarea value={formSrv.descripcion} onChange={e => setFormSrv({ ...formSrv, descripcion: e.target.value })} className="w-full p-2 border rounded" rows="2"></textarea></div>
               <div className="col-span-2 border-t mt-2 pt-4">
-                <label className="block text-sm font-bold mb-2 text-indigo-600"><ImageIcon className="inline h-4 w-4 mr-1"/> Galería de Trabajos Previos</label>
+                <label className="block text-sm font-bold mb-2 text-indigo-600"><ImageIcon className="inline h-4 w-4 mr-1" /> Galería de Trabajos Previos</label>
                 <div className="flex gap-2 mb-2">
                   <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'srv_galeria', setFormSrv)} className="text-sm border rounded p-1 w-full" />
                   {uploadingObj === 'srv_galeria' && <span className="text-xs text-gray-500 self-center">Subiendo...</span>}
@@ -371,7 +370,7 @@ export default function AdminPanel() {
                     {formSrv.galeria_urls.map((url, idx) => (
                       <div key={idx} className="relative h-20 w-20 group">
                         <img src={url} alt="" className="h-full w-full object-cover rounded-lg shadow-sm border border-gray-200" />
-                        <button type="button" onClick={() => setFormSrv({...formSrv, galeria_urls: formSrv.galeria_urls.filter((_, i) => i !== idx)})} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button type="button" onClick={() => setFormSrv({ ...formSrv, galeria_urls: formSrv.galeria_urls.filter((_, i) => i !== idx) })} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow opacity-0 group-hover:opacity-100 transition-opacity">
                           <X className="h-3 w-3" />
                         </button>
                       </div>
@@ -393,8 +392,8 @@ export default function AdminPanel() {
                 <div className="p-4">
                   <h3 className="font-bold text-lg">{srv.nombre}</h3>
                   <div className="flex gap-2 mt-2 absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => openSrvForm(srv)} className="bg-white p-1 rounded shadow text-blue-600"><Edit2 className="h-4 w-4"/></button>
-                    <button onClick={() => handleDeleteSrv(srv.id)} className="bg-white p-1 rounded shadow text-red-600"><Trash2 className="h-4 w-4"/></button>
+                    <button onClick={() => openSrvForm(srv)} className="bg-white p-1 rounded shadow text-blue-600"><Edit2 className="h-4 w-4" /></button>
+                    <button onClick={() => handleDeleteSrv(srv.id)} className="bg-white p-1 rounded shadow text-red-600"><Trash2 className="h-4 w-4" /></button>
                   </div>
                   <p className="text-sm text-gray-500">${srv.precio} • {srv.duracion_min} min</p>
                 </div>
@@ -413,7 +412,7 @@ export default function AdminPanel() {
 
           {showEmpForm && (
             <form onSubmit={handleSaveEmp} className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100 mb-8 grid grid-cols-2 gap-4">
-              <div><label className="block text-sm font-bold mb-1">Nombre</label><input required type="text" value={formEmp.nombre} onChange={e=>setFormEmp({...formEmp,nombre:e.target.value})} className="w-full p-2 border rounded" /></div>
+              <div><label className="block text-sm font-bold mb-1">Nombre</label><input required type="text" value={formEmp.nombre} onChange={e => setFormEmp({ ...formEmp, nombre: e.target.value })} className="w-full p-2 border rounded" /></div>
               <div>
                 <label className="block text-sm font-bold mb-1">Foto de Perfil</label>
                 <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'emp', setFormEmp)} className="text-sm border rounded p-1 w-full" />
@@ -422,9 +421,9 @@ export default function AdminPanel() {
               <div className="col-span-2 border-t mt-2 pt-4">
                 <h4 className="font-bold text-sm mb-2 text-indigo-600">Datos de Acceso al Panel</h4>
               </div>
-              <div><label className="block text-sm font-bold mb-1">Correo (Email)</label><input type="email" value={formEmp.email} onChange={e=>setFormEmp({...formEmp,email:e.target.value})} className="w-full p-2 border rounded" placeholder="Para iniciar sesión" /></div>
-              <div><label className="block text-sm font-bold mb-1">Contraseña</label><input type="text" value={formEmp.password} onChange={e=>setFormEmp({...formEmp,password:e.target.value})} className="w-full p-2 border rounded" placeholder="Asigna una contraseña" /></div>
-              
+              <div><label className="block text-sm font-bold mb-1">Correo (Email)</label><input type="email" value={formEmp.email} onChange={e => setFormEmp({ ...formEmp, email: e.target.value })} className="w-full p-2 border rounded" placeholder="Para iniciar sesión" /></div>
+              <div><label className="block text-sm font-bold mb-1">Contraseña</label><input type="text" value={formEmp.password} onChange={e => setFormEmp({ ...formEmp, password: e.target.value })} className="w-full p-2 border rounded" placeholder="Asigna una contraseña" /></div>
+
               <div className="col-span-2 flex justify-end gap-2 mt-4">
                 <button type="button" onClick={() => setShowEmpForm(false)} className="px-4 py-2 text-gray-500 font-bold hover:bg-gray-100 rounded">Cancelar</button>
                 <button type="submit" className="px-4 py-2 bg-theme-primary text-white font-bold rounded">Guardar</button>
@@ -436,8 +435,8 @@ export default function AdminPanel() {
             {empleados.map(emp => (
               <div key={emp.id} className="bg-white rounded-2xl p-6 border border-gray-200 text-center relative group">
                 <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => openEmpForm(emp)} className="text-blue-600 hover:bg-blue-50 p-1 rounded"><Edit2 className="h-4 w-4"/></button>
-                  <button onClick={() => handleDeleteEmp(emp.id)} className="text-red-600 hover:bg-red-50 p-1 rounded"><Trash2 className="h-4 w-4"/></button>
+                  <button onClick={() => openEmpForm(emp)} className="text-blue-600 hover:bg-blue-50 p-1 rounded"><Edit2 className="h-4 w-4" /></button>
+                  <button onClick={() => handleDeleteEmp(emp.id)} className="text-red-600 hover:bg-red-50 p-1 rounded"><Trash2 className="h-4 w-4" /></button>
                 </div>
                 {emp.foto_url ? (
                   <img src={emp.foto_url} className="w-20 h-20 rounded-full mx-auto mb-4 object-cover border-4 border-gray-50 shadow-sm" alt="" />
@@ -456,20 +455,20 @@ export default function AdminPanel() {
       {activeTab === 'config' && negocio && (
         <div className="grid md:grid-cols-2 gap-8">
           <form onSubmit={handleSaveConfig} className="bg-white p-6 rounded-2xl border border-gray-200 space-y-6">
-            <h3 className="font-bold text-xl mb-4 flex items-center"><Settings className="mr-2 h-5 w-5"/> Personalización</h3>
-            
+            <h3 className="font-bold text-xl mb-4 flex items-center"><Settings className="mr-2 h-5 w-5" /> Personalización</h3>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-bold mb-2">Color Primario</label>
                 <div className="flex items-center gap-2">
-                  <input type="color" value={negocio.color_primario || '#0f172a'} onChange={e => setNegocio({...negocio, color_primario: e.target.value})} className="h-10 w-10 border rounded cursor-pointer" />
+                  <input type="color" value={negocio.color_primario || '#0f172a'} onChange={e => setNegocio({ ...negocio, color_primario: e.target.value })} className="h-10 w-10 border rounded cursor-pointer" />
                   <span className="text-sm font-mono">{negocio.color_primario}</span>
                 </div>
               </div>
               <div>
                 <label className="block text-sm font-bold mb-2">Color Secundario</label>
                 <div className="flex items-center gap-2">
-                  <input type="color" value={negocio.color_secundario || '#334155'} onChange={e => setNegocio({...negocio, color_secundario: e.target.value})} className="h-10 w-10 border rounded cursor-pointer" />
+                  <input type="color" value={negocio.color_secundario || '#334155'} onChange={e => setNegocio({ ...negocio, color_secundario: e.target.value })} className="h-10 w-10 border rounded cursor-pointer" />
                   <span className="text-sm font-mono">{negocio.color_secundario}</span>
                 </div>
               </div>
@@ -477,26 +476,26 @@ export default function AdminPanel() {
 
             <div>
               <label className="block text-sm font-bold mb-2">Descripción Corta</label>
-              <textarea value={negocio.descripcion_corta || ''} onChange={e => setNegocio({...negocio, descripcion_corta: e.target.value})} className="w-full px-4 py-2 border rounded-xl" rows="2" placeholder="Escribe una breve descripción o eslogan para tu negocio..."></textarea>
+              <textarea value={negocio.descripcion_corta || ''} onChange={e => setNegocio({ ...negocio, descripcion_corta: e.target.value })} className="w-full px-4 py-2 border rounded-xl" rows="2" placeholder="Escribe una breve descripción o eslogan para tu negocio..."></textarea>
             </div>
 
             <div className="border-t pt-4">
               <h4 className="font-bold mb-4 flex items-center">Información de Contacto</h4>
-              
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-bold mb-2">Dirección Física</label>
-                  <input type="text" value={negocio.direccion || ''} onChange={e => setNegocio({...negocio, direccion: e.target.value})} className="w-full px-4 py-2 border rounded-xl" placeholder="Ej. Av. Principal 123" />
+                  <input type="text" value={negocio.direccion || ''} onChange={e => setNegocio({ ...negocio, direccion: e.target.value })} className="w-full px-4 py-2 border rounded-xl" placeholder="Ej. Av. Principal 123" />
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-bold mb-2">Teléfono</label>
-                    <input type="text" value={negocio.telefono || ''} onChange={e => setNegocio({...negocio, telefono: e.target.value})} className="w-full px-4 py-2 border rounded-xl" placeholder="Ej. 555-1234" />
+                    <input type="text" value={negocio.telefono || ''} onChange={e => setNegocio({ ...negocio, telefono: e.target.value })} className="w-full px-4 py-2 border rounded-xl" placeholder="Ej. 555-1234" />
                   </div>
                   <div>
                     <label className="block text-sm font-bold mb-2">WhatsApp</label>
-                    <input type="text" value={negocio.whatsapp || ''} onChange={e => setNegocio({...negocio, whatsapp: e.target.value})} className="w-full px-4 py-2 border rounded-xl" placeholder="Ej. +1234567890" />
+                    <input type="text" value={negocio.whatsapp || ''} onChange={e => setNegocio({ ...negocio, whatsapp: e.target.value })} className="w-full px-4 py-2 border rounded-xl" placeholder="Ej. +1234567890" />
                   </div>
                 </div>
               </div>
@@ -504,21 +503,21 @@ export default function AdminPanel() {
 
             <div className="border-t pt-4">
               <h4 className="font-bold mb-4 flex items-center">Redes Sociales</h4>
-              
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-bold mb-2">Facebook URL</label>
-                  <input type="url" value={negocio.facebook || ''} onChange={e => setNegocio({...negocio, facebook: e.target.value})} className="w-full px-4 py-2 border rounded-xl" placeholder="https://facebook.com/..." />
+                  <input type="url" value={negocio.facebook || ''} onChange={e => setNegocio({ ...negocio, facebook: e.target.value })} className="w-full px-4 py-2 border rounded-xl" placeholder="https://facebook.com/..." />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-bold mb-2">Instagram URL</label>
-                  <input type="url" value={negocio.instagram || ''} onChange={e => setNegocio({...negocio, instagram: e.target.value})} className="w-full px-4 py-2 border rounded-xl" placeholder="https://instagram.com/..." />
+                  <input type="url" value={negocio.instagram || ''} onChange={e => setNegocio({ ...negocio, instagram: e.target.value })} className="w-full px-4 py-2 border rounded-xl" placeholder="https://instagram.com/..." />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-bold mb-2">TikTok URL</label>
-                  <input type="url" value={negocio.tiktok || ''} onChange={e => setNegocio({...negocio, tiktok: e.target.value})} className="w-full px-4 py-2 border rounded-xl" placeholder="https://tiktok.com/@..." />
+                  <input type="url" value={negocio.tiktok || ''} onChange={e => setNegocio({ ...negocio, tiktok: e.target.value })} className="w-full px-4 py-2 border rounded-xl" placeholder="https://tiktok.com/@..." />
                 </div>
               </div>
             </div>
@@ -529,16 +528,16 @@ export default function AdminPanel() {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-bold mb-2">Puntos Meta (Citas necesarias para premio)</label>
-                    <input type="number" min="1" max="20" value={negocio.fidelidad_puntos_meta || 10} onChange={e => setNegocio({...negocio, fidelidad_puntos_meta: parseInt(e.target.value) || 1})} className="w-full px-4 py-2 border rounded-xl" />
+                    <input type="number" min="1" max="20" value={negocio.fidelidad_puntos_meta || 10} onChange={e => setNegocio({ ...negocio, fidelidad_puntos_meta: parseInt(e.target.value) || 1 })} className="w-full px-4 py-2 border rounded-xl" />
                   </div>
                   <div>
                     <label className="block text-sm font-bold mb-2">Recompensa (Premio)</label>
-                    <input type="text" value={negocio.fidelidad_recompensa || ''} onChange={e => setNegocio({...negocio, fidelidad_recompensa: e.target.value})} className="w-full px-4 py-2 border rounded-xl" placeholder="Ej. Corte gratis en tu décima cita" />
+                    <input type="text" value={negocio.fidelidad_recompensa || ''} onChange={e => setNegocio({ ...negocio, fidelidad_recompensa: e.target.value })} className="w-full px-4 py-2 border rounded-xl" placeholder="Ej. Corte gratis en tu décima cita" />
                     <p className="text-xs text-gray-500 mt-1">Este texto aparecerá en la tarjeta de los clientes para motivarlos a regresar.</p>
                   </div>
                   <div>
                     <label className="block text-sm font-bold mb-2">Entregar premio cada X puntos</label>
-                    <input type="number" min="0" max="20" value={negocio.fidelidad_intervalo_premio || 0} onChange={e => setNegocio({...negocio, fidelidad_intervalo_premio: parseInt(e.target.value) || 0})} className="w-full px-4 py-2 border rounded-xl" />
+                    <input type="number" min="0" max="20" value={negocio.fidelidad_intervalo_premio || 0} onChange={e => setNegocio({ ...negocio, fidelidad_intervalo_premio: parseInt(e.target.value) || 0 })} className="w-full px-4 py-2 border rounded-xl" />
                     <p className="text-xs text-gray-500 mt-1">Pon 0 si solo das premio al completar toda la tarjeta. Pon 3 para dar premios en la cita 3, 6, 9, etc.</p>
                   </div>
                 </div>
@@ -563,7 +562,7 @@ export default function AdminPanel() {
                       {[...Array(negocio.fidelidad_puntos_meta || 10)].map((_, idx) => {
                         const interval = negocio.fidelidad_intervalo_premio || 0;
                         const isReward = idx === (negocio.fidelidad_puntos_meta || 10) - 1 || (interval > 0 && (idx + 1) % interval === 0);
-                        
+
                         if (isReward) {
                           return (
                             <div key={idx} className="w-10 h-10 rounded-full flex flex-col items-center justify-center text-white font-black leading-tight shadow-md" style={{ backgroundColor: negocio.color_primario || '#000000' }}>
@@ -571,9 +570,9 @@ export default function AdminPanel() {
                             </div>
                           )
                         }
-                        
+
                         return (
-                          <div key={idx} className="w-10 h-10 rounded-full flex items-center justify-center" style={{ 
+                          <div key={idx} className="w-10 h-10 rounded-full flex items-center justify-center" style={{
                             border: `2px solid ${negocio.color_primario || '#000000'}`,
                             backgroundColor: 'transparent'
                           }}>
@@ -588,12 +587,12 @@ export default function AdminPanel() {
 
             <div className="border-t pt-4">
               <label className="block text-sm font-bold mb-2">Enlace de Google Maps (Para botón "Cómo llegar")</label>
-              <input type="url" value={negocio.mapa_enlace || ''} onChange={e => setNegocio({...negocio, mapa_enlace: e.target.value})} className="w-full px-4 py-2 border rounded-xl" placeholder="https://maps.app.goo.gl/..." />
+              <input type="url" value={negocio.mapa_enlace || ''} onChange={e => setNegocio({ ...negocio, mapa_enlace: e.target.value })} className="w-full px-4 py-2 border rounded-xl" placeholder="https://maps.app.goo.gl/..." />
             </div>
-            
+
             <div>
               <label className="block text-sm font-bold mb-2">Embed de Google Maps (Iframe Src)</label>
-              <input type="url" value={negocio.mapa_embed || ''} onChange={e => setNegocio({...negocio, mapa_embed: e.target.value})} className="w-full px-4 py-2 border rounded-xl" placeholder="https://www.google.com/maps/embed?pb=..." />
+              <input type="url" value={negocio.mapa_embed || ''} onChange={e => setNegocio({ ...negocio, mapa_embed: e.target.value })} className="w-full px-4 py-2 border rounded-xl" placeholder="https://www.google.com/maps/embed?pb=..." />
               <p className="text-xs text-gray-500 mt-1">Extrae solo la URL que va dentro de src="..." en Google Maps &gt; Compartir &gt; Insertar un mapa.</p>
             </div>
 
@@ -601,7 +600,7 @@ export default function AdminPanel() {
           </form>
 
           <div className="bg-white p-6 rounded-2xl border border-gray-200">
-            <h3 className="font-bold text-xl mb-4 flex items-center"><ImageIcon className="mr-2 h-5 w-5"/> Logo del Negocio</h3>
+            <h3 className="font-bold text-xl mb-4 flex items-center"><ImageIcon className="mr-2 h-5 w-5" /> Logo del Negocio</h3>
             {negocio.logo_url && (
               <img src={negocio.logo_url} className="h-32 w-32 rounded-full object-cover border-4 border-gray-100 shadow-md mb-6" alt="Logo" />
             )}
@@ -615,7 +614,7 @@ export default function AdminPanel() {
           </div>
 
           <div className="bg-white p-6 rounded-2xl border border-gray-200 md:col-span-2">
-            <h3 className="font-bold text-xl mb-4 flex items-center"><ImageIcon className="mr-2 h-5 w-5"/> Galería de Trabajos (Carrusel Principal)</h3>
+            <h3 className="font-bold text-xl mb-4 flex items-center"><ImageIcon className="mr-2 h-5 w-5" /> Galería de Trabajos (Carrusel Principal)</h3>
             <div className="flex gap-2 mb-4">
               <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'negocio_galeria')} className="text-sm border rounded p-1 w-full max-w-sm" />
               {uploadingObj === 'negocio_galeria' && <span className="text-sm text-gray-500 self-center font-bold">Subiendo...</span>}
@@ -630,8 +629,8 @@ export default function AdminPanel() {
                       const newGaleria = negocio.galeria_urls.filter((_, i) => i !== idx);
                       try {
                         await supabase.from('negocios').update({ galeria_urls: newGaleria }).eq('id', negocio.id);
-                        setNegocio({...negocio, galeria_urls: newGaleria});
-                      } catch(err) { alert('Error eliminando'); }
+                        setNegocio({ ...negocio, galeria_urls: newGaleria });
+                      } catch (err) { alert('Error eliminando'); }
                     }} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow opacity-0 group-hover:opacity-100 transition-opacity">
                       <X className="h-4 w-4" />
                     </button>
@@ -670,7 +669,7 @@ export default function AdminPanel() {
                   {comentarios.map(c => (
                     <tr key={c.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 font-bold text-gray-900">{c.nombre}</td>
-                      <td className="px-6 py-4 text-amber-400 text-lg">{'★'.repeat(c.calificacion)}<span className="text-gray-200">{'★'.repeat(5-c.calificacion)}</span></td>
+                      <td className="px-6 py-4 text-amber-400 text-lg">{'★'.repeat(c.calificacion)}<span className="text-gray-200">{'★'.repeat(5 - c.calificacion)}</span></td>
                       <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
                         <div className="line-clamp-2" title={c.texto}>{c.texto}</div>
                       </td>

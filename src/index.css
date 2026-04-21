@@ -28,24 +28,33 @@ body {
 @utility bg-theme-primary {
   background-color: var(--color-primary);
 }
+
 @utility bg-theme-secondary {
   background-color: var(--color-secondary);
 }
+
 @utility text-theme-primary {
   color: var(--color-primary);
 }
+
 @utility text-theme-secondary {
   color: var(--color-secondary);
 }
+
 @utility border-theme-primary {
   border-color: var(--color-primary);
 }
+
 @utility bg-theme-gradient {
   background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
 }
 
 /* Animaciones suaves globales (excepto para layouts) */
-button, a, input, select, textarea {
+button,
+a,
+input,
+select,
+textarea {
   transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 200ms;
@@ -53,10 +62,21 @@ button, a, input, select, textarea {
 
 /* Custom Animations */
 @keyframes blob {
-  0% { transform: translate(0px, 0px) scale(1); }
-  33% { transform: translate(30px, -50px) scale(1.1); }
-  66% { transform: translate(-20px, 20px) scale(0.9); }
-  100% { transform: translate(0px, 0px) scale(1); }
+  0% {
+    transform: translate(0px, 0px) scale(1);
+  }
+
+  33% {
+    transform: translate(30px, -50px) scale(1.1);
+  }
+
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+
+  100% {
+    transform: translate(0px, 0px) scale(1);
+  }
 }
 
 @utility animate-blob {
@@ -73,4 +93,16 @@ button, a, input, select, textarea {
 
 @utility ring-theme-primary {
   --tw-ring-color: var(--color-primary);
+}
+
+.rotate-y-12 {
+  transform: rotateY(12deg);
+}
+
+.-rotate-y-12 {
+  transform: rotateY(-12deg);
+}
+
+.perspective-1200 {
+  perspective: 1200px;
 }

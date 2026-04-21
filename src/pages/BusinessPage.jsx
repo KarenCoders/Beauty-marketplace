@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { 
-  Clock, DollarSign, MapPin, Phone, Calendar as CalendarIcon, 
+import {
+  Clock, DollarSign, MapPin, Phone, Calendar as CalendarIcon,
   User, ChevronRight, CheckCircle2, X, ChevronLeft, MessageSquare,
   Users, Camera, Link2
 } from 'lucide-react';
-import { 
-  format, addMonths, subMonths, startOfMonth, endOfMonth, 
-  startOfWeek, endOfWeek, isSameMonth, isSameDay, eachDayOfInterval, 
-  isBefore, startOfDay, parseISO, addDays 
+import {
+  format, addMonths, subMonths, startOfMonth, endOfMonth,
+  startOfWeek, endOfWeek, isSameMonth, isSameDay, eachDayOfInterval,
+  isBefore, startOfDay, parseISO, addDays
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -28,14 +28,14 @@ export default function BusinessPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedService, setSelectedService] = useState(null);
   const [galleryIndex, setGalleryIndex] = useState(0);
-  
+
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedEmployee, setSelectedEmployee] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
   const [clienteNombre, setClienteNombre] = useState('');
   const [clienteTelefono, setClienteTelefono] = useState('');
   const [sessionUser, setSessionUser] = useState(null);
-  
+
   const [availableTimes, setAvailableTimes] = useState([]);
   const [citasDelDia, setCitasDelDia] = useState([]);
   const [bookingLoading, setBookingLoading] = useState(false);
@@ -90,6 +90,17 @@ export default function BusinessPage() {
       setCitasDelDia([]);
     }
   }, [selectedDate]);
+  useEffect(() => {
+    if (!negocio?.galeria_urls?.length) return;
+
+    const interval = setInterval(() => {
+      setGlobalGalleryIndex(prev =>
+        prev === negocio.galeria_urls.length - 1 ? 0 : prev + 1
+      ); // 👈 SIEMPRE AVANZA HACIA LA IZQUIERDA VISUAL
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, [negocio]);
 
   async function fetchBusinessData() {
     try {
@@ -191,12 +202,12 @@ export default function BusinessPage() {
       if (error) throw error;
 
       setStep(3); // Mostrar Success
-      
+
       // Abrir WhatsApp
       const empName = empleados.find(e => e.id === selectedEmployee)?.nombre;
-      const fTime = selectedTime.substring(0,5);
+      const fTime = selectedTime.substring(0, 5);
       const msg = `Hola ${negocio.nombre}, agendé el servicio "${selectedService.nombre}" para el ${format(selectedDate, 'dd/MM/yyyy')} a las ${fTime} con ${empName}. Mi nombre es ${clienteNombre}.`;
-      
+
       const phone = negocio.whatsapp ? negocio.whatsapp.replace(/\D/g, '') : '';
       if (phone) {
         setTimeout(() => {
@@ -223,7 +234,7 @@ export default function BusinessPage() {
           calificacion: newComment.calificacion
         }).eq('id', editingCommentId);
         if (error) throw error;
-        
+
         setComentarios(comentarios.map(c => c.id === editingCommentId ? { ...c, ...newComment } : c));
         setEditingCommentId(null);
       } else {
@@ -232,7 +243,7 @@ export default function BusinessPage() {
           ...newComment
         }]).select();
         if (error) throw error;
-        
+
         const newId = data[0].id;
         setComentarios([data[0], ...comentarios]);
         const updatedMis = [...misComentarios, newId];
@@ -278,6 +289,32 @@ export default function BusinessPage() {
       </div>
     );
   };
+  // AUTOPLAY GALERÍA GLOBAL
+  useEffect(() => {
+    if (!negocio?.galeria_urls?.length) return;
+
+    const interval = setInterval(() => {
+      setGlobalGalleryIndex(prev =>
+        prev === negocio.galeria_urls.length - 1 ? 0 : prev + 1
+      );
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [negocio]);
+
+  // AUTOPLAY GALERÍA DEL MODAL (SERVICIO)
+  useEffect(() => {
+    if (!isModalOpen || !selectedService?.galeria_urls?.length) return;
+
+    const interval = setInterval(() => {
+      setGalleryIndex(prev =>
+        prev === selectedService.galeria_urls.length - 1 ? 0 : prev + 1
+      );
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, [isModalOpen, selectedService]);
+
 
   const renderDays = () => {
     const days = [];
@@ -297,7 +334,7 @@ export default function BusinessPage() {
     const monthEnd = endOfMonth(monthStart);
     const startDate = startOfWeek(monthStart, { weekStartsOn: 1 });
     const endDate = endOfWeek(monthEnd, { weekStartsOn: 1 });
-    
+
     const dateFormat = "d";
     const rows = [];
     let days = [];
@@ -342,7 +379,7 @@ export default function BusinessPage() {
       <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-indigo-600"></div>
     </div>
   );
-  
+
   if (!negocio) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 pt-20">
       <h2 className="text-2xl font-bold text-gray-900">Negocio no encontrado</h2>
@@ -357,7 +394,7 @@ export default function BusinessPage() {
         <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[120%] bg-white/20 rounded-full mix-blend-overlay filter blur-3xl opacity-50 animate-blob"></div>
         <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[120%] bg-black/20 rounded-full mix-blend-overlay filter blur-3xl opacity-50 animate-blob animation-delay-2000"></div>
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent mix-blend-multiply"></div>
-        
+
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-28 z-10">
           <div className="flex flex-col md:flex-row items-center md:items-end gap-10">
             <div className="relative group">
@@ -369,19 +406,19 @@ export default function BusinessPage() {
                 </div>
               )}
             </div>
-            
+
             <div className="text-center md:text-left flex-1">
               <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-white/20 backdrop-blur-md text-white mb-3 uppercase tracking-wider">
                 {negocio.categoria}
               </span>
               <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-2 drop-shadow-md">{negocio.nombre}</h1>
-              
+
               {negocio.descripcion_corta && (
                 <p className="mt-2 text-lg opacity-90 leading-relaxed max-w-2xl text-white drop-shadow-sm font-medium">
                   {negocio.descripcion_corta}
                 </p>
               )}
-              
+
               <div className="flex flex-col sm:flex-row gap-4 mt-4 text-sm md:text-base opacity-90 font-medium items-center md:items-start justify-center md:justify-start">
                 {negocio.direccion && (
                   <div className="flex items-center bg-black/20 px-4 py-2 rounded-lg backdrop-blur-sm">
@@ -422,58 +459,114 @@ export default function BusinessPage() {
       </div>
 
       {/* Carrusel de Galería Global */}
-      {negocio.galeria_urls && negocio.galeria_urls.length > 0 && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 mb-8">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight">Nuestros Trabajos</h2>
+      <div className="max-w-5xl mx-auto px-4 mt-10">
+
+        <div className="relative h-[380px] sm:h-[480px] flex items-center justify-center overflow-hidden">
+
+          <div className="relative w-full flex items-center justify-center perspective-1200">
+
+            {negocio.galeria_urls.map((img, idx) => {
+
+              const total = negocio.galeria_urls.length;
+
+              // posición relativa basada en índice activo
+              let position = (idx - globalGalleryIndex + total) % total;
+
+              if (position > total / 2) {
+                position = position - total;
+              }
+
+              const isActive = position === 0;
+
+              let transform = "";
+              let opacity = 1;
+              let zIndex = 0;
+              let blur = 0;
+
+              // CENTRO
+              if (isActive) {
+                transform = "translateX(0px) scale(1.2) rotateY(0deg)";
+                zIndex = 50;
+                blur = 0;
+              }
+
+              // IZQUIERDA (sale)
+              else if (position < 0) {
+                transform = `translateX(${position * 160}px) scale(${1 + position * 0.08}) rotateY(35deg)`;
+                zIndex = 30 + position;
+                opacity = 0.5 + (position * 0.1);
+                blur = Math.abs(position) * 1.5;
+              }
+
+              // DERECHA (entra)
+              else {
+                transform = `translateX(${position * 160}px) scale(${1 - position * 0.08}) rotateY(-35deg)`;
+                zIndex = 30 - position;
+                opacity = 0.5;
+                blur = position * 1.5;
+              }
+
+              return (
+                <img
+                  key={idx}
+                  src={img}
+                  onClick={() => setGlobalGalleryIndex(idx)}
+                  className="absolute w-[270px] h-[320px] object-cover rounded-3xl cursor-pointer transition-all duration-700 ease-out"
+                  style={{
+                    transform,
+                    zIndex,
+                    opacity,
+                    filter: `blur(${blur}px) drop-shadow(0 25px 40px rgba(0,0,0,0.35))`
+                  }}
+                  alt="galeria"
+                />
+              );
+            })}
+
           </div>
-          <div className="relative w-full h-64 md:h-[32rem] rounded-[2rem] overflow-hidden bg-gray-100 shadow-2xl group border border-gray-200">
-            <img 
-              src={negocio.galeria_urls[globalGalleryIndex]} 
-              className="w-full h-full object-cover transition-opacity duration-500" 
-              alt="Galería del negocio" 
-            />
-            {negocio.galeria_urls.length > 1 && (
-              <>
-                <button 
-                  onClick={() => setGlobalGalleryIndex(prev => prev === 0 ? negocio.galeria_urls.length - 1 : prev - 1)}
-                  className="absolute left-6 top-1/2 -translate-y-1/2 bg-white/50 hover:bg-white text-gray-900 p-3 rounded-full backdrop-blur-md shadow-lg transition-all transform hover:scale-110 opacity-0 group-hover:opacity-100"
-                >
-                  <ChevronLeft className="h-6 w-6" />
-                </button>
-                <button 
-                  onClick={() => setGlobalGalleryIndex(prev => prev === negocio.galeria_urls.length - 1 ? 0 : prev + 1)}
-                  className="absolute right-6 top-1/2 -translate-y-1/2 bg-white/50 hover:bg-white text-gray-900 p-3 rounded-full backdrop-blur-md shadow-lg transition-all transform hover:scale-110 opacity-0 group-hover:opacity-100"
-                >
-                  <ChevronRight className="h-6 w-6" />
-                </button>
-                <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-2">
-                  {negocio.galeria_urls.map((_, idx) => (
-                    <button key={idx} onClick={() => setGlobalGalleryIndex(idx)} className={`h-2.5 rounded-full transition-all shadow-sm ${idx === globalGalleryIndex ? 'w-8 bg-white' : 'w-2.5 bg-white/50 hover:bg-white/80'}`}></button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
+
+          {/* CONTROLES */}
+          <button
+            onClick={() =>
+              setGlobalGalleryIndex(prev =>
+                prev === 0 ? negocio.galeria_urls.length - 1 : prev - 1
+              )
+            }
+            className="absolute left-5 bg-white/80 p-3 rounded-full shadow-lg hover:scale-110 transition"
+          >
+            <ChevronLeft />
+          </button>
+
+          <button
+            onClick={() =>
+              setGlobalGalleryIndex(prev =>
+                prev === negocio.galeria_urls.length - 1 ? 0 : prev + 1
+              )
+            }
+            className="absolute right-5 bg-white/80 p-3 rounded-full shadow-lg hover:scale-110 transition"
+          >
+            <ChevronRight />
+          </button>
+
         </div>
-      )}
+      </div>
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 mt-12">
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight">Menú de Servicios</h2>
           <span className="text-gray-500 font-medium bg-white px-4 py-1.5 rounded-full border border-gray-200 shadow-sm">{servicios.length} disponibles</span>
         </div>
-        
+
         {/* Catálogo Limpio */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {servicios.map(servicio => (
-            <div 
-              key={servicio.id} 
+            <div
+              key={servicio.id}
               onClick={() => openServiceModal(servicio)}
               className="group cursor-pointer bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 hover:border-theme-primary/30 transition-all duration-300 hover:shadow-2xl hover:-translate-y-2 relative overflow-hidden flex flex-col justify-between"
             >
               <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-theme-primary/10 to-transparent rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-125 duration-500"></div>
-              
+
               <div className="relative z-10">
                 <h3 className="text-2xl font-extrabold text-gray-900 group-hover:text-theme-primary transition-colors mb-3 tracking-tight">
                   {servicio.nombre}
@@ -517,9 +610,9 @@ export default function BusinessPage() {
               </h2>
               <p className="text-gray-600 mb-6">{negocio.direccion}</p>
               {negocio.mapa_enlace && (
-                <a 
-                  href={negocio.mapa_enlace} 
-                  target="_blank" 
+                <a
+                  href={negocio.mapa_enlace}
+                  target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center px-6 py-3 bg-theme-primary text-white font-bold rounded-xl hover:opacity-90 transition-opacity shadow-lg shadow-theme-primary/30"
                 >
@@ -529,13 +622,13 @@ export default function BusinessPage() {
             </div>
             {negocio.mapa_embed && (
               <div className="w-full md:w-1/2 h-48 rounded-2xl overflow-hidden border-4 border-gray-50 shadow-inner bg-gray-100">
-                <iframe 
-                  src={negocio.mapa_embed} 
-                  width="100%" 
-                  height="100%" 
-                  style={{border:0}} 
-                  allowFullScreen="" 
-                  loading="lazy" 
+                <iframe
+                  src={negocio.mapa_embed}
+                  width="100%"
+                  height="100%"
+                  style={{ border: 0 }}
+                  allowFullScreen=""
+                  loading="lazy"
                   referrerPolicy="no-referrer-when-downgrade"
                   title="Mapa del negocio"
                 ></iframe>
@@ -550,7 +643,7 @@ export default function BusinessPage() {
         <h2 className="text-3xl font-extrabold text-gray-900 mb-8 flex items-center">
           <MessageSquare className="mr-3 h-8 w-8 text-theme-primary" /> Reseñas de Clientes
         </h2>
-        
+
         <div className="grid md:grid-cols-3 gap-8">
           <div className="md:col-span-1">
             <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 sticky top-24">
@@ -558,13 +651,13 @@ export default function BusinessPage() {
               <form onSubmit={handleSubmitComment} className="space-y-4">
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Tu Nombre</label>
-                  <input required type="text" value={newComment.nombre} onChange={e=>setNewComment({...newComment, nombre: e.target.value})} className="w-full p-3 border-2 border-gray-100 rounded-xl focus:border-theme-primary outline-none" placeholder="Ej. Ana Gómez" />
+                  <input required type="text" value={newComment.nombre} onChange={e => setNewComment({ ...newComment, nombre: e.target.value })} className="w-full p-3 border-2 border-gray-100 rounded-xl focus:border-theme-primary outline-none" placeholder="Ej. Ana Gómez" />
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Calificación</label>
                   <div className="flex gap-1">
-                    {[1,2,3,4,5].map(star => (
-                      <button type="button" key={star} onClick={() => setNewComment({...newComment, calificacion: star})} className={`text-2xl transition-transform hover:scale-110 ${newComment.calificacion >= star ? 'text-amber-400' : 'text-gray-200'}`}>
+                    {[1, 2, 3, 4, 5].map(star => (
+                      <button type="button" key={star} onClick={() => setNewComment({ ...newComment, calificacion: star })} className={`text-2xl transition-transform hover:scale-110 ${newComment.calificacion >= star ? 'text-amber-400' : 'text-gray-200'}`}>
                         ★
                       </button>
                     ))}
@@ -572,7 +665,7 @@ export default function BusinessPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Comentario</label>
-                  <textarea required value={newComment.texto} onChange={e=>setNewComment({...newComment, texto: e.target.value})} className="w-full p-3 border-2 border-gray-100 rounded-xl focus:border-theme-primary outline-none" rows="3" placeholder="¿Cómo fue tu experiencia?"></textarea>
+                  <textarea required value={newComment.texto} onChange={e => setNewComment({ ...newComment, texto: e.target.value })} className="w-full p-3 border-2 border-gray-100 rounded-xl focus:border-theme-primary outline-none" rows="3" placeholder="¿Cómo fue tu experiencia?"></textarea>
                 </div>
                 <div className="flex gap-2">
                   <button type="submit" className="flex-1 py-3 bg-theme-primary text-white font-bold rounded-xl shadow-lg shadow-theme-primary/30 hover:opacity-90 transition-opacity">
@@ -590,7 +683,7 @@ export default function BusinessPage() {
               </form>
             </div>
           </div>
-          
+
           <div className="md:col-span-2 space-y-4">
             {comentarios.length === 0 ? (
               <div className="bg-white p-8 rounded-3xl border border-dashed border-gray-200 text-center text-gray-500 font-medium">
@@ -609,21 +702,21 @@ export default function BusinessPage() {
                   </div>
                   <p className="text-gray-600 text-sm mb-3 leading-relaxed">{comentario.texto}</p>
                   <span className="text-xs text-gray-400 font-medium">{new Date(comentario.created_at).toLocaleDateString()}</span>
-                  
+
                   {misComentarios.includes(comentario.id) && (
                     <div className="mt-4 pt-3 border-t border-gray-100 flex gap-4">
-                      <button 
+                      <button
                         onClick={() => {
                           setEditingCommentId(comentario.id);
                           setNewComment({ nombre: comentario.nombre, texto: comentario.texto, calificacion: comentario.calificacion });
                           window.scrollTo({ top: 0, behavior: 'smooth' });
-                        }} 
+                        }}
                         className="text-xs text-theme-primary font-bold hover:underline"
                       >
                         Editar
                       </button>
-                      <button 
-                        onClick={() => handleDeleteComment(comentario.id)} 
+                      <button
+                        onClick={() => handleDeleteComment(comentario.id)}
                         className="text-xs text-red-500 font-bold hover:underline"
                       >
                         Eliminar
@@ -641,7 +734,7 @@ export default function BusinessPage() {
       {isModalOpen && selectedService && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
           <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity" onClick={closeModal}></div>
-          
+
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto relative z-10 animate-in zoom-in-95 duration-200">
             <button onClick={closeModal} className="absolute top-4 right-4 h-8 w-8 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center text-gray-500 transition-colors z-20">
               <X className="h-5 w-5" />
@@ -653,40 +746,59 @@ export default function BusinessPage() {
                 <div className="mb-8 border-b border-gray-100 pb-6">
                   <span className="text-xs font-bold uppercase tracking-wider text-theme-primary mb-2 block">Detalles del Servicio</span>
                   <h2 className="text-3xl font-extrabold text-gray-900 mb-4">{selectedService.nombre}</h2>
-                  
+
                   {/* Carrusel de Galería */}
-                  {selectedService.galeria_urls && selectedService.galeria_urls.length > 0 && (
-                    <div className="relative w-full h-48 sm:h-64 mb-6 rounded-2xl overflow-hidden bg-gray-100 shadow-inner group">
-                      <img 
-                        src={selectedService.galeria_urls[galleryIndex]} 
-                        className="w-full h-full object-cover transition-opacity duration-300" 
-                        alt="Trabajo previo" 
-                      />
-                      
-                      {selectedService.galeria_urls.length > 1 && (
-                        <>
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); setGalleryIndex(prev => prev === 0 ? selectedService.galeria_urls.length - 1 : prev - 1); }}
-                            className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/50 text-white p-2 rounded-full backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <ChevronLeft className="h-5 w-5" />
-                          </button>
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); setGalleryIndex(prev => prev === selectedService.galeria_urls.length - 1 ? 0 : prev + 1); }}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/50 text-white p-2 rounded-full backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <ChevronRight className="h-5 w-5" />
-                          </button>
-                          
-                          <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5">
-                            {selectedService.galeria_urls.map((_, idx) => (
-                              <div key={idx} className={`h-1.5 rounded-full transition-all ${idx === galleryIndex ? 'w-4 bg-white' : 'w-1.5 bg-white/50'}`}></div>
-                            ))}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  )}
+                  <div className="relative w-full aspect-square max-w-md mx-auto mb-6 rounded-2xl overflow-hidden bg-black shadow-inner group">
+                    <img
+                      src={selectedService.galeria_urls[galleryIndex]}
+                      className="w-full h-full object-cover transition-all duration-500"
+                      alt="Trabajo previo"
+                    />
+
+                    {selectedService.galeria_urls.length > 1 && (
+                      <>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setGalleryIndex(prev =>
+                              prev === 0
+                                ? selectedService.galeria_urls.length - 1
+                                : prev - 1
+                            );
+                          }}
+                          className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/40 text-white p-2 rounded-full"
+                        >
+                          <ChevronLeft className="h-5 w-5" />
+                        </button>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setGalleryIndex(prev =>
+                              prev === selectedService.galeria_urls.length - 1
+                                ? 0
+                                : prev + 1
+                            );
+                          }}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40 text-white p-2 rounded-full"
+                        >
+                          <ChevronRight className="h-5 w-5" />
+                        </button>
+
+                        <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5">
+                          {selectedService.galeria_urls.map((_, idx) => (
+                            <div
+                              key={idx}
+                              className={`h-1.5 rounded-full transition-all ${idx === galleryIndex
+                                ? 'w-4 bg-white'
+                                : 'w-1.5 bg-white/50'
+                                }`}
+                            />
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
 
                   {selectedService.descripcion && (
                     <p className="text-gray-600 leading-relaxed mb-4">{selectedService.descripcion}</p>
@@ -735,13 +847,12 @@ export default function BusinessPage() {
                             type="button"
                             key={time}
                             onClick={() => { setSelectedTime(time); setSelectedEmployee(''); }}
-                            className={`py-2 px-1 text-sm font-bold rounded-xl transition-all ${
-                              selectedTime === time 
-                                ? 'bg-theme-primary text-white shadow-lg transform scale-105 ring-2 ring-theme-primary ring-offset-1' 
-                                : 'bg-white border border-gray-200 text-gray-700 hover:border-theme-primary hover:text-theme-primary'
-                            }`}
+                            className={`py-2 px-1 text-sm font-bold rounded-xl transition-all ${selectedTime === time
+                              ? 'bg-theme-primary text-white shadow-lg transform scale-105 ring-2 ring-theme-primary ring-offset-1'
+                              : 'bg-white border border-gray-200 text-gray-700 hover:border-theme-primary hover:text-theme-primary'
+                              }`}
                           >
-                            {time.substring(0,5)}
+                            {time.substring(0, 5)}
                           </button>
                         ))
                       )}
@@ -759,9 +870,8 @@ export default function BusinessPage() {
                           type="button"
                           key={emp.id}
                           onClick={() => setSelectedEmployee(emp.id)}
-                          className={`p-3 rounded-xl border-2 text-sm font-bold text-left transition-all flex items-center ${
-                            selectedEmployee === emp.id ? 'border-theme-primary bg-theme-primary/5 text-theme-primary' : 'border-gray-100 text-gray-600 hover:border-gray-300'
-                          }`}
+                          className={`p-3 rounded-xl border-2 text-sm font-bold text-left transition-all flex items-center ${selectedEmployee === emp.id ? 'border-theme-primary bg-theme-primary/5 text-theme-primary' : 'border-gray-100 text-gray-600 hover:border-gray-300'
+                            }`}
                         >
                           {emp.foto_url ? (
                             <img src={emp.foto_url} alt="" className={`h-8 w-8 rounded-full mr-3 object-cover border-2 ${selectedEmployee === emp.id ? 'border-theme-primary' : 'border-transparent'}`} />
@@ -781,15 +891,14 @@ export default function BusinessPage() {
                   type="button"
                   disabled={!selectedTime}
                   onClick={() => setStep(2)}
-                  className={`w-full py-4 rounded-xl font-bold text-lg text-white transition-all flex justify-center items-center ${
-                    selectedTime ? 'bg-theme-primary hover:opacity-90 shadow-lg shadow-theme-primary/30' : 'bg-gray-300 cursor-not-allowed'
-                  }`}
+                  className={`w-full py-4 rounded-xl font-bold text-lg text-white transition-all flex justify-center items-center ${selectedTime ? 'bg-theme-primary hover:opacity-90 shadow-lg shadow-theme-primary/30' : 'bg-gray-300 cursor-not-allowed'
+                    }`}
                 >
-                  {empleados.length === 0 ? 'Reserva no disponible' : 
-                   !selectedDate ? 'Selecciona una fecha' : 
-                   !selectedTime ? 'Selecciona un horario' : 
-                   !selectedEmployee ? 'Elige un especialista' : 
-                   'Continuar Reserva'} 
+                  {empleados.length === 0 ? 'Reserva no disponible' :
+                    !selectedDate ? 'Selecciona una fecha' :
+                      !selectedTime ? 'Selecciona un horario' :
+                        !selectedEmployee ? 'Elige un especialista' :
+                          'Continuar Reserva'}
                   {selectedTime && <ChevronRight className="ml-2 h-5 w-5" />}
                 </button>
               </div>
@@ -802,13 +911,13 @@ export default function BusinessPage() {
                 </button>
 
                 <h2 className="text-2xl font-extrabold text-gray-900 mb-6">Tus Datos</h2>
-                
+
                 {/* Resumen */}
                 <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-8">
                   <div className="font-bold text-gray-900 mb-1">{selectedService.nombre}</div>
                   <div className="text-sm text-gray-600 flex items-center gap-4">
                     <span><CalendarIcon className="inline h-4 w-4 mr-1" /> {format(selectedDate, 'dd/MM/yyyy')}</span>
-                    <span><Clock className="inline h-4 w-4 mr-1" /> {selectedTime.substring(0,5)}</span>
+                    <span><Clock className="inline h-4 w-4 mr-1" /> {selectedTime.substring(0, 5)}</span>
                   </div>
                 </div>
 
@@ -869,4 +978,5 @@ export default function BusinessPage() {
       )}
     </div>
   );
+
 }
